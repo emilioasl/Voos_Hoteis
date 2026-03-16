@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Buscador de Viagens</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #ffffff;
+  --surface: #f7f8fa;
+  --surface2: #eef0f4;
+  --border: #e2e5ec;
+  --border2: #d0d4de;
+  --accent-h: #0052cc;       /* hoteis+voos: azul */
+  --accent-h-light: #e8f0ff;
+  --accent-v: #00875a;       /* apenas voos: verde */
+  --accent-v-light: #e3f5ee;
+  --warn: #e85d04;
+  --text: #1a1d27;
+  --text-muted: #5a6072;
+  --text-dim: #9ba3b5;
+  --radius: 8px;
+  --mono: 'Space Mono', monospace;
+  --sans: 'DM Sans', sans-serif;
+  --mode-accent: var(--accent-h);
+  --mode-light: var(--accent-h-light);
+}
+body.mode-voos {
+  --mode-accent: var(--accent-v);
+  --mode-light: var(--accent-v-light);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; }
+
+/* ── LANDING ── */
+#landing {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  padding: 40px 20px;
+}
+.landing-logo {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.15em;
+  color: var(--text-dim);
+  margin-bottom: 40px;
+  text-transform: uppercase;
+}
+.landing-title {
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 10px;
+  text-align: center;
+}
+.landing-sub {
+  font-size: 15px;
+  color: var(--text-muted);
+  margin-bottom: 52px;
+  text-align: center;
+}
+.landing-cards {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.landing-card {
+  border: 2px solid var(--border);
+  border-radius: 16px;
+  padding: 36px 40px;
+  width: 260px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: #fff;
+}
+.landing-card:hover { transform: translateY(-4px); box-shadow: 0 12px 32px rgba(0,0,0,0.09); }
+.landing-card.voos-h:hover { border-color: var(--accent-h); }
+.landing-card.voos-v:hover { border-color: var(--accent-v); }
+.landing-card .lc-icon { font-size: 44px; margin-bottom: 18px; display: block; }
+.landing-card .lc-title { font-size: 17px; font-weight: 600; margin-bottom: 8px; }
+.landing-card .lc-desc { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+.landing-card.voos-h .lc-title { color: var(--accent-h); }
+.landing-card.voos-v .lc-title { color: var(--accent-v); }
+.landing-card .lc-btn {
+  margin-top: 20px;
+  display: inline-block;
+  padding: 9px 22px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+}
+.landing-card.voos-h .lc-btn { background: var(--accent-h); }
+.landing-card.voos-v .lc-btn { background: var(--accent-v); }
+
+/* ── APP ── */
+#app { display: none; }
+
+/* HEADER */
+header {
+  border-bottom: 1px solid var(--border);
+  padding: 14px 28px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: #fff;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+}
+.header-mode {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-weight: 700;
+  background: var(--mode-light);
+  color: var(--mode-accent);
+  border: 1px solid var(--mode-accent);
+  white-space: nowrap;
+}
+.switch-btn {
+  margin-left: auto;
+  padding: 7px 16px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border2);
+  background: #fff;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.switch-btn:hover { border-color: var(--mode-accent); color: var(--mode-accent); }
+#status-bar {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+#status-bar b { color: var(--mode-accent); }
+
+/* LAYOUT */
+.layout {
+  display: grid;
+  grid-template-columns: 210px 1fr;
+  min-height: calc(100vh - 53px);
+}
+
+/* SIDEBAR */
+aside {
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+  padding: 20px 0;
+  position: sticky;
+  top: 53px;
+  height: calc(100vh - 53px);
+  overflow-y: auto;
+}
+.sidebar-section {
+  padding: 0 14px 18px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 18px;
+}
+.sidebar-section:last-child { border-bottom: none; }
+.sidebar-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--text-dim);
+  margin-bottom: 10px;
+  text-transform: uppercase;
+}
+
+/* LOADING */
+.loading-box {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+  line-height: 1.5;
+}
+.spinner {
+  display: inline-block;
+  width: 14px; height: 14px;
+  border: 2px solid var(--border2);
+  border-top-color: var(--mode-accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* FILE CHIPS */
+.file-list { display: flex; flex-direction: column; gap: 5px; }
+.file-chip {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 7px 10px;
+  font-size: 11px;
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+}
+.file-chip.latest { border-color: var(--mode-accent); }
+.file-chip .fc-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--border2); margin-top: 3px; flex-shrink: 0;
+}
+.file-chip.latest .fc-dot { background: var(--mode-accent); }
+.file-chip .fc-info { flex: 1; min-width: 0; }
+.file-chip .fc-date { font-family: var(--mono); color: var(--mode-accent); font-size: 10px; }
+.file-chip .fc-name { color: var(--text-dim); font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-chip .fc-count { color: var(--text-dim); font-size: 10px; }
+.badge-latest {
+  font-family: var(--mono); font-size: 9px;
+  background: var(--mode-accent); color: #fff;
+  padding: 1px 5px; border-radius: 4px; letter-spacing: 0.04em;
+}
+
+/* CITY / DEST FILTER */
+.city-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.city-btn {
+  background: #fff; border: 1px solid var(--border);
+  border-radius: var(--radius); color: var(--text-muted);
+  font-family: var(--mono); font-size: 11px;
+  padding: 6px 4px; text-align: center;
+  cursor: pointer; transition: all 0.15s; letter-spacing: 0.03em;
+}
+.city-btn:hover { border-color: var(--mode-accent); color: var(--mode-accent); }
+.city-btn.active { background: var(--mode-accent); border-color: var(--mode-accent); color: #fff; font-weight: 700; }
+.city-btn.all-btn { grid-column: 1 / -1; background: var(--surface2); }
+.city-btn.all-btn.active { background: var(--mode-accent); color: #fff; }
+
+/* SEARCH */
+.search-wrap { position: relative; }
+.search-wrap input {
+  width: 100%; background: #fff; border: 1px solid var(--border);
+  border-radius: var(--radius); color: var(--text);
+  font-family: var(--sans); font-size: 12px;
+  padding: 8px 10px 8px 30px; outline: none; transition: border-color 0.2s;
+}
+.search-wrap input:focus { border-color: var(--mode-accent); }
+.search-wrap .si { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: var(--text-dim); font-size: 13px; pointer-events: none; }
+
+/* MAIN */
+main { padding: 22px 26px; overflow-x: hidden; }
+
+.toolbar {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 18px; flex-wrap: wrap;
+}
+.sort-group { display: flex; gap: 5px; flex-wrap: wrap; }
+.sort-btn {
+  background: #fff; border: 1px solid var(--border);
+  border-radius: var(--radius); color: var(--text-muted);
+  font-size: 12px; padding: 6px 12px; cursor: pointer; transition: all 0.15s; white-space: nowrap;
+}
+.sort-btn:hover { border-color: var(--mode-accent); color: var(--mode-accent); }
+.sort-btn.active { background: var(--mode-accent); border-color: var(--mode-accent); color: #fff; }
+.result-count { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--text-muted); }
+.result-count b { color: var(--text); }
+
+/* TABLE */
+.table-wrap {
+  overflow-x: auto; border: 1px solid var(--border);
+  border-radius: var(--radius); background: #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+thead { background: var(--surface); position: sticky; top: 53px; }
+thead th {
+  padding: 10px 13px; text-align: left;
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em;
+  color: var(--text-muted); border-bottom: 1px solid var(--border);
+  white-space: nowrap; text-transform: uppercase; cursor: pointer; user-select: none;
+}
+thead th:hover { color: var(--mode-accent); }
+thead th.sorted { color: var(--mode-accent); }
+tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+tbody tr:last-child { border-bottom: none; }
+tbody tr:hover { background: var(--mode-light); }
+td { padding: 9px 13px; vertical-align: middle; }
+
+.badge-dest {
+  display: inline-block; border-radius: 5px;
+  font-family: var(--mono); font-size: 10px;
+  padding: 2px 7px; letter-spacing: 0.06em;
+  border: 1px solid; white-space: nowrap;
+}
+.badge-dest.hotel { background: var(--accent-h-light); color: var(--accent-h); border-color: rgba(0,82,204,0.2); }
+.badge-dest.voo { background: var(--accent-v-light); color: var(--accent-v); border-color: rgba(0,135,90,0.2); }
+
+.badge-file {
+  display: inline-block; font-family: var(--mono); font-size: 10px;
+  padding: 2px 7px; border-radius: 4px; letter-spacing: 0.03em;
+  border: 1px solid var(--border); color: var(--text-muted); background: var(--surface2);
+}
+.badge-file.is-latest {
+  background: var(--mode-light); border-color: var(--mode-accent); color: var(--mode-accent);
+}
+
+.price-final { font-family: var(--mono); font-size: 13px; font-weight: 700; color: var(--mode-accent); }
+.price-sub { color: var(--text-muted); font-size: 11px; font-family: var(--mono); }
+
+.badge-escala {
+  display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 4px;
+  font-weight: 500; white-space: nowrap;
+}
+.badge-escala.direto { background: #e3f5ee; color: #00875a; }
+.badge-escala.escala { background: #fff3e0; color: #e85d04; }
+
+.link-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; padding: 3px 9px; border-radius: 4px;
+  text-decoration: none; border: 1px solid var(--border);
+  color: var(--text-muted); background: var(--surface2); transition: all 0.15s; white-space: nowrap;
+}
+.link-btn:hover { border-color: var(--mode-accent); color: var(--mode-accent); background: var(--mode-light); }
+.links-cell { display: flex; gap: 5px; flex-wrap: wrap; }
+
+/* EMPTY */
+.empty-state { text-align: center; padding: 70px 20px; color: var(--text-dim); }
+.empty-state .big { font-size: 44px; margin-bottom: 14px; }
+.empty-state p { color: var(--text-muted); font-size: 14px; line-height: 1.7; }
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
+@media (max-width: 768px) {
+  .layout { grid-template-columns: 1fr; }
+  aside { position: static; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
+  main { padding: 14px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════
+     LANDING — escolha do modo
+══════════════════════════════════════════════ -->
+<div id="landing">
+  <div class="landing-logo">✦ Buscador de Viagens</div>
+  <div class="landing-title">O que você quer ver?</div>
+  <div class="landing-sub">Escolha o tipo de busca para continuar</div>
+  <div class="landing-cards">
+    <div class="landing-card voos-h" onclick="enterMode('hoteis')">
+      <span class="lc-icon">🏨✈️</span>
+      <div class="lc-title">Voos e Hotéis</div>
+      <div class="lc-desc">Pacotes com preço total:<br>hospedagem + passagem</div>
+      <span class="lc-btn">Ver resultados →</span>
+    </div>
+    <div class="landing-card voos-v" onclick="enterMode('voos')">
+      <span class="lc-icon">✈️</span>
+      <div class="lc-title">Apenas Voos</div>
+      <div class="lc-desc">Somente passagens aéreas,<br>todas as datas disponíveis</div>
+      <span class="lc-btn">Ver resultados →</span>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     APP
+══════════════════════════════════════════════ -->
+<div id="app">
+
+  <header>
+    <div class="header-mode" id="headerMode">—</div>
+    <div id="status-bar">carregando...</div>
+    <button class="switch-btn" id="switchBtn" onclick="switchMode()">⇄ <span id="switchLabel">—</span></button>
+  </header>
+
+  <div class="layout">
+    <aside>
+      <!-- FILES -->
+      <div class="sidebar-section">
+        <div class="sidebar-label">Arquivos carregados</div>
+        <div id="loadingBox" class="loading-box">
+          <span class="spinner"></span>buscando CSVs...
+        </div>
+        <div class="file-list" id="fileList"></div>
+      </div>
+
+      <!-- SEARCH -->
+      <div class="sidebar-section">
+        <div class="sidebar-label">Busca rápida</div>
+        <div class="search-wrap">
+          <span class="si">🔍</span>
+          <input type="text" id="searchInput" placeholder="cidade, destino...">
+        </div>
+      </div>
+
+      <!-- DEST FILTER -->
+      <div class="sidebar-section" id="destSection" style="display:none">
+        <div class="sidebar-label" id="destLabel">Filtrar destino</div>
+        <div class="city-grid" id="cityGrid"></div>
+      </div>
+    </aside>
+
+    <main>
+      <div id="emptyState" class="empty-state">
+        <div class="big">⏳</div>
+        <p>Buscando arquivos no repositório...<br>
+        <span style="font-size:12px;color:var(--text-dim)">Se demorar, verifique o nome do repositório no topo do arquivo.</span></p>
+      </div>
+
+      <div id="dataSection" style="display:none">
+        <div class="toolbar">
+          <div class="sort-group" id="sortGroup"></div>
+          <div class="result-count" id="resultCount"></div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead id="tableHead"></thead>
+            <tbody id="tableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════════════
+// CONFIG — ajuste aqui com seu usuário e repositório do GitHub
+// ══════════════════════════════════════════════════════════════════════════
+const GITHUB_USER = 'emilioasl';
+const GITHUB_REPO = 'Voos_Hoteis';
+const GITHUB_BRANCH = 'main';
+const MAX_FILES = 10;
+
+const PATTERN_HOTEIS = '____________BUSCADOR_Hoteis_por_Data_';
+const PATTERN_VOOS   = '_compilado_Voos.csv';
+
+// ══════════════════════════════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════════════════════════════
+const state = {
+  mode: 'hoteis',   // 'hoteis' | 'voos'
+  files: [],
+  allRows: [],
+  selectedDest: 'ALL',
+  sortCol: '',
+  sortAsc: true,
+  search: '',
+};
+
+// ══════════════════════════════════════════════════════════════════════════
+// LANDING
+// ══════════════════════════════════════════════════════════════════════════
+function enterMode(mode) {
+  state.mode = mode;
+  document.getElementById('landing').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.body.className = mode === 'voos' ? 'mode-voos' : '';
+  updateHeader();
+  loadFromGitHub();
+}
+
+function switchMode() {
+  const newMode = state.mode === 'hoteis' ? 'voos' : 'hoteis';
+  state.mode = newMode;
+  state.files = [];
+  state.allRows = [];
+  state.selectedDest = 'ALL';
+  state.search = '';
+  document.getElementById('searchInput').value = '';
+  document.body.className = newMode === 'voos' ? 'mode-voos' : '';
+  updateHeader();
+  showLoading();
+  loadFromGitHub();
+}
+
+function updateHeader() {
+  const isHoteis = state.mode === 'hoteis';
+  document.getElementById('headerMode').textContent = isHoteis ? '🏨✈️  Voos e Hotéis' : '✈️  Apenas Voos';
+  document.getElementById('switchLabel').textContent = isHoteis ? 'Apenas Voos' : 'Voos e Hotéis';
+  document.getElementById('destLabel').textContent = isHoteis ? 'Filtrar cidade' : 'Filtrar destino';
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// GITHUB API — lista arquivos e baixa CSVs
+// ══════════════════════════════════════════════════════════════════════════
+async function loadFromGitHub() {
+  showLoading();
+  try {
+    const apiUrl = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/git/trees/${GITHUB_BRANCH}?recursive=1`;
+    const res = await fetch(apiUrl);
+    if (!res.ok) throw new Error('Erro ao acessar repositório: ' + res.status);
+    const data = await res.json();
+
+    const pattern = state.mode === 'hoteis' ? PATTERN_HOTEIS : PATTERN_VOOS;
+    let files = data.tree
+      .filter(f => f.type === 'blob' && f.path.includes(pattern) && f.path.endsWith('.csv'))
+      .map(f => ({ path: f.path, name: f.path.split('/').pop() }));
+
+    // Sort by filename (date is embedded), take last MAX_FILES
+    files.sort((a, b) => a.name.localeCompare(b.name));
+    if (files.length > MAX_FILES) files = files.slice(-MAX_FILES);
+
+    // Mark latest
+    files.forEach((f, i) => { f.isLatest = i === files.length - 1; });
+
+    // Download each CSV
+    state.files = [];
+    state.allRows = [];
+    for (const f of files) {
+      const rawUrl = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${GITHUB_BRANCH}/${f.path}`;
+      const csvRes = await fetch(rawUrl);
+      const text = await csvRes.text();
+      const rows = parseCSV(text);
+      const date = extractDate(f.name);
+      state.files.push({ name: f.name, date, isLatest: f.isLatest, count: rows.length });
+      for (const row of rows) {
+        state.allRows.push({ ...row, _file_date: date, _file_name: f.name, _is_latest: f.isLatest });
+      }
+    }
+
+    // Default sort
+    state.sortCol = state.mode === 'hoteis' ? 'Final Price' : 'PREÇO';
+    state.sortAsc = true;
+    render();
+  } catch (err) {
+    document.getElementById('loadingBox').innerHTML =
+      `<span style="color:#e85d04">⚠️ Erro ao carregar:<br>${err.message}</span>`;
+    document.getElementById('emptyState').querySelector('p').innerHTML =
+      `Não foi possível carregar os arquivos.<br><small>${err.message}</small>`;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// CSV PARSING
+// ══════════════════════════════════════════════════════════════════════════
+function parseCSV(text) {
+  const lines = text.replace(/\r/g, '').trim().split('\n');
+  if (lines.length < 2) return [];
+  const headers = smartSplit(lines[0]).map(h => h.trim());
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    if (!lines[i].trim()) continue;
+    const cols = smartSplit(lines[i]);
+    const obj = {};
+    headers.forEach((h, idx) => { obj[h] = (cols[idx] || '').trim(); });
+    rows.push(obj);
+  }
+  return rows;
+}
+
+function smartSplit(line) {
+  const result = []; let cur = ''; let inQuote = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') { inQuote = !inQuote; continue; }
+    if (c === ',' && !inQuote) { result.push(cur); cur = ''; }
+    else cur += c;
+  }
+  result.push(cur);
+  return result;
+}
+
+function extractDate(name) {
+  const m = name.match(/(\d{4}-\d{2}-\d{2})(?:[_T](\d{2}[-:]\d{2}))?/);
+  if (m) return m[1] + (m[2] ? ' ' + m[2].replace('-', ':') : '');
+  return 'data desconhecida';
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// FILTER & SORT
+// ══════════════════════════════════════════════════════════════════════════
+function getFiltered() {
+  let rows = state.allRows;
+  const destKey = state.mode === 'hoteis' ? 'City' : 'PARA';
+
+  if (state.selectedDest !== 'ALL') {
+    rows = rows.filter(r => r[destKey] === state.selectedDest);
+  }
+  if (state.search) {
+    const q = state.search.toLowerCase();
+    rows = rows.filter(r => Object.values(r).some(v => String(v).toLowerCase().includes(q)));
+  }
+  rows = [...rows].sort((a, b) => {
+    const va = a[state.sortCol] || '', vb = b[state.sortCol] || '';
+    const na = parseFloat(String(va).replace(/[^0-9.-]/g,'')),
+          nb = parseFloat(String(vb).replace(/[^0-9.-]/g,''));
+    if (!isNaN(na) && !isNaN(nb)) return state.sortAsc ? na - nb : nb - na;
+    return state.sortAsc ? String(va).localeCompare(String(vb)) : String(vb).localeCompare(String(va));
+  });
+  return rows;
+}
+
+function getDests() {
+  const key = state.mode === 'hoteis' ? 'City' : 'PARA';
+  return [...new Set(state.allRows.map(r => r[key]).filter(Boolean))].sort();
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// RENDER
+// ══════════════════════════════════════════════════════════════════════════
+function render() {
+  renderFileList();
+  renderDestFilter();
+  renderSortBar();
+  renderTable();
+  updateStatus();
+}
+
+function showLoading() {
+  document.getElementById('loadingBox').style.display = 'block';
+  document.getElementById('loadingBox').innerHTML = '<span class="spinner"></span>buscando CSVs...';
+  document.getElementById('fileList').innerHTML = '';
+  document.getElementById('emptyState').style.display = 'block';
+  document.getElementById('dataSection').style.display = 'none';
+  document.getElementById('destSection').style.display = 'none';
+  document.getElementById('status-bar').innerHTML = 'carregando...';
+}
+
+function renderFileList() {
+  document.getElementById('loadingBox').style.display = 'none';
+  const el = document.getElementById('fileList');
+  if (!state.files.length) { el.innerHTML = '<div style="font-size:11px;color:var(--text-dim);text-align:center">Nenhum arquivo encontrado</div>'; return; }
+  el.innerHTML = [...state.files].reverse().map(f => `
+    <div class="file-chip ${f.isLatest ? 'latest' : ''}">
+      <div class="fc-dot"></div>
+      <div class="fc-info">
+        <div class="fc-date">${f.date} ${f.isLatest ? '<span class="badge-latest">ATUAL</span>' : ''}</div>
+        <div class="fc-name" title="${f.name}">${f.name}</div>
+        <div class="fc-count">${f.count} registros</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderDestFilter() {
+  const dests = getDests();
+  const section = document.getElementById('destSection');
+  const grid = document.getElementById('cityGrid');
+  if (!dests.length) { section.style.display = 'none'; return; }
+  section.style.display = 'block';
+  const allActive = state.selectedDest === 'ALL';
+  grid.innerHTML = `
+    <button class="city-btn all-btn ${allActive ? 'active' : ''}" onclick="selectDest('ALL')">TODOS (${state.allRows.length})</button>
+    ${dests.map(d => {
+      const key = state.mode === 'hoteis' ? 'City' : 'PARA';
+      const count = state.allRows.filter(r => r[key] === d).length;
+      return `<button class="city-btn ${state.selectedDest === d ? 'active' : ''}" onclick="selectDest('${d}')">${d}<br><span style="font-size:9px;opacity:0.6">${count}</span></button>`;
+    }).join('')}
+  `;
+}
+
+// Sort columns per mode
+const SORT_HOTEIS = [
+  { col: 'Final Price', label: 'Preço Total' },
+  { col: 'Checkin_Date', label: 'Check-in' },
+  { col: '# Days', label: 'Dias' },
+  { col: '_file_date', label: 'Data Busca' },
+];
+const SORT_VOOS = [
+  { col: 'PREÇO', label: 'Preço' },
+  { col: 'DATA_DE_IDA', label: 'Data Ida' },
+  { col: 'MILHAS', label: 'Milhas' },
+  { col: '_file_date', label: 'Data Busca' },
+];
+
+function renderSortBar() {
+  const cols = state.mode === 'hoteis' ? SORT_HOTEIS : SORT_VOOS;
+  document.getElementById('sortGroup').innerHTML =
+    `<span style="font-size:12px;color:var(--text-muted)">Ordenar:</span>` +
+    cols.map(c => `
+      <button class="sort-btn ${state.sortCol === c.col ? 'active' : ''}"
+        onclick="setSort('${c.col}')">
+        ${c.label}${state.sortCol === c.col ? (state.sortAsc ? ' ↑' : ' ↓') : ''}
+      </button>
+    `).join('');
+}
+
+// ── TABLE HEADS ──
+const HEAD_HOTEIS = ['DATA BUSCA','CIDADE','CHECK-IN','DIAS','HOTEL','FONTE','PREÇOS','LINKS'];
+const HEAD_VOOS   = ['DATA BUSCA','DE','PARA','CIDADE','DATA IDA','VOLTA','HORÁRIO','ESCALA','PREÇO','MILHAS','LINK'];
+
+function renderTable() {
+  const empty = document.getElementById('emptyState');
+  const section = document.getElementById('dataSection');
+
+  if (!state.files.length) { empty.style.display = 'block'; section.style.display = 'none'; return; }
+  empty.style.display = 'none';
+  section.style.display = 'block';
+
+  const rows = getFiltered();
+  document.getElementById('resultCount').innerHTML = `<b>${rows.length}</b> resultados`;
+
+  // Head
+  const heads = state.mode === 'hoteis' ? HEAD_HOTEIS : HEAD_VOOS;
+  document.getElementById('tableHead').innerHTML =
+    '<tr>' + heads.map(h => `<th>${h}</th>`).join('') + '</tr>';
+
+  // Body
+  const tbody = document.getElementById('tableBody');
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="${heads.length}" style="text-align:center;padding:40px;color:var(--text-dim)">Nenhum resultado encontrado</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = rows.map(r => state.mode === 'hoteis' ? rowHoteis(r) : rowVoos(r)).join('');
+}
+
+function rowHoteis(r) {
+  const fp = parseFloat(r['Final Price']) || 0;
+  const hp = parseFloat(r['Price']) || 0;
+  const ap = parseFloat(r['Air Price']) || 0;
+  return `<tr>
+    <td><span class="badge-file ${r._is_latest ? 'is-latest' : ''}">${r._file_date}</span></td>
+    <td><span class="badge-dest hotel">${r.City||'?'}</span><br><small style="color:var(--text-dim)">${r['City Name']||''}</small></td>
+    <td style="font-family:var(--mono);font-size:12px">${r.Checkin_Date||'-'}</td>
+    <td style="font-family:var(--mono);text-align:center">${r['# Days']||'-'}</td>
+    <td><div style="font-size:12px;line-height:1.3;max-width:160px">${r['Hotel Name']||'-'}</div></td>
+    <td style="font-size:11px;color:var(--text-muted)">${r.Source||'-'}</td>
+    <td>
+      <div class="price-final">R$ ${fp.toLocaleString('pt-BR')}</div>
+      <div class="price-sub">🏨 R$ ${hp.toLocaleString('pt-BR')}</div>
+      <div class="price-sub">✈️ R$ ${ap.toLocaleString('pt-BR')}</div>
+    </td>
+    <td><div class="links-cell">
+      ${r.URL ? `<a href="${r.URL}" target="_blank" class="link-btn">🏨 Hotel</a>` : ''}
+      ${r.url_flight ? `<a href="${r.url_flight}" target="_blank" class="link-btn">✈️ Voo</a>` : ''}
+    </div></td>
+  </tr>`;
+}
+
+function rowVoos(r) {
+  const preco = parseFloat(r['PREÇO']) || 0;
+  const isDireto = (r.ESCALA||'').toLowerCase() === 'direto';
+  return `<tr>
+    <td><span class="badge-file ${r._is_latest ? 'is-latest' : ''}">${r._file_date}</span></td>
+    <td style="font-family:var(--mono);font-size:12px;font-weight:700">${r.DE||'-'}</td>
+    <td><span class="badge-dest voo">${r.PARA||'?'}</span></td>
+    <td><div style="font-size:12px">${r.CIDADE||'-'}</div><small style="color:var(--text-dim)">${r['PAÍS']||''}</small></td>
+    <td style="font-family:var(--mono);font-size:12px">${r.DATA_DE_IDA||'-'}</td>
+    <td style="font-size:11px;color:var(--text-muted)">${r.VOLTA||'-'}</td>
+    <td style="font-family:var(--mono);font-size:12px">${r.HORÁRIO||'-'}</td>
+    <td><span class="badge-escala ${isDireto ? 'direto' : 'escala'}">${r.ESCALA||'-'}</span></td>
+    <td><div class="price-final">R$ ${preco.toLocaleString('pt-BR')}</div></td>
+    <td style="font-family:var(--mono);font-size:12px;color:var(--text-muted)">${r.MILHAS||'-'}</td>
+    <td>${r.URL ? `<a href="${r.URL}" target="_blank" class="link-btn">✈️ Ver voo</a>` : '-'}</td>
+  </tr>`;
+}
+
+function updateStatus() {
+  const dests = getDests().length;
+  const label = state.mode === 'hoteis' ? 'cidades' : 'destinos';
+  document.getElementById('status-bar').innerHTML =
+    `<b>${state.files.length}</b> arquivo(s) · <b>${state.allRows.length}</b> registros · <b>${dests}</b> ${label}`;
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// ACTIONS
+// ══════════════════════════════════════════════════════════════════════════
+function selectDest(d) { state.selectedDest = d; render(); }
+
+function setSort(col) {
+  if (state.sortCol === col) state.sortAsc = !state.sortAsc;
+  else { state.sortCol = col; state.sortAsc = true; }
+  renderSortBar();
+  renderTable();
+}
+
+document.getElementById('searchInput').addEventListener('input', e => {
+  state.search = e.target.value; renderTable();
+});
+
+window.selectDest = selectDest;
+window.setSort = setSort;
+window.switchMode = switchMode;
+window.enterMode = enterMode;
+</script>
+</body>
+</html>
