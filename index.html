@@ -163,9 +163,11 @@ td { padding: 9px 13px; vertical-align: middle; }
 ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
 
 @media (max-width: 768px) {
-  .layout { grid-template-columns: 1fr; }
-  aside { position: static; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
-  main { padding: 14px; }
+  .layout { grid-template-columns: 1fr; display: flex; flex-direction: column; }
+  aside { position: static; height: auto; border-right: none; border-bottom: 1px solid var(--border); order: 0; display: flex; flex-direction: column; }
+  aside #filesSection { order: 99; border-top: 1px solid var(--border); margin-top: 0; }
+  main { padding: 14px; order: 1; }
+  #filesSection { border-bottom: 1px solid var(--border); }
 }
 </style>
 </head>
@@ -221,7 +223,7 @@ td { padding: 9px 13px; vertical-align: middle; }
       </div>
 
       <!-- 3. ARQUIVOS — colapsável, por baixo -->
-      <div class="sidebar-section">
+      <div class="sidebar-section" id="filesSection">
         <div class="collapse-header" onclick="toggleArquivos()">
           <div class="sidebar-label">Arquivos carregados</div>
           <span class="collapse-arrow" id="collapseArrow">▼</span>
@@ -682,13 +684,11 @@ const SORT_H = [
   {col:'Final Price', label:'Preço Total'},
   {col:'Checkin_Date', label:'Check-in'},
   {col:'# Days', label:'Dias'},
-  {col:'_file_date', label:'Data Busca'},
 ];
 const SORT_V = [
   {col:'PREÇO', label:'Preço'},
   {col:'DATA_DE_IDA', label:'Data Ida'},
   {col:'MILHAS', label:'Milhas'},
-  {col:'_file_date', label:'Data Busca'},
 ];
 
 function renderSortBar() {
