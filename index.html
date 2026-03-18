@@ -304,6 +304,68 @@ function parsePrice(str) {
   return parseFloat(s) || 0;
 }
 
+// ── DATE UTILS ────────────────────────────────────────────────────────────
+const MESES = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+const MONTH_MAP = {
+  jan:1,jann:1, fev:2, mar:3, abr:4, mai:5,
+  jun:6,junn:6, jul:7,jull:7, ago:8,
+  set:9,sett:9, out:10,outt:10, nov:11,novv:11, dez:12,dezz:12
+};
+
+// "02/abr/2026" or ISO "2026-04-02" → "02/abr/2026"
+function fmtDate(str) {
+  if (!str || str === '-' || str === 'Unknown') return str || '-';
+  str = String(str).trim();
+  // already formatted
+  if (/^\d{2}\/[a-z]{3}\/\d{4}$/i.test(str)) return str;
+  // ISO date
+  if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+    const d = new Date(str.substring(0,10) + 'T12:00:00');
+    if (!isNaN(d)) return `${String(d.getDate()).padStart(2,'0')}/${MESES[d.getMonth()]}/${d.getFullYear()}`;
+  }
+  return str;
+}
+
+// "2abr5abr" → { ida: "02/abr/2026", volta: "05/abr/2026" }
+function parseGoogleDate(raw) {
+  if (!raw || raw === '-' || raw === 'Unknown') return { ida: raw || '-', volta: '' };
+  raw = String(raw).trim();
+
+  // Already ISO → just format, no volta
+  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return { ida: fmtDate(raw), volta: '' };
+
+  // Extract all (digits + letters) pairs
+  const pat = /(\d+)([a-záéíóúãõâêôç]+)/gi;
+  const parts = [];
+  let m;
+  while ((m = pat.exec(raw.toLowerCase())) !== null) {
+    const day = parseInt(m[1]);
+    const monRaw = m[2].toLowerCase();
+    let monthNum = MONTH_MAP[monRaw];
+    if (!monthNum) {
+      // fuzzy: try first 3 chars
+      for (const [k,v] of Object.entries(MONTH_MAP)) {
+        if (monRaw.startsWith(k.substring(0,3))) { monthNum = v; break; }
+      }
+    }
+    if (monthNum) parts.push({ day, mon: MESES[monthNum-1], monthNum });
+  }
+
+  if (parts.length === 0) return { ida: raw, volta: '' };
+
+  const today = new Date();
+  const getYear = (mn) => mn >= today.getMonth()+1 ? today.getFullYear() : today.getFullYear()+1;
+
+  const fmt = (p) => `${String(p.day).padStart(2,'0')}/${p.mon}/${getYear(p.monthNum)}`;
+
+  return {
+    ida:   fmt(parts[0]),
+    volta: parts.length >= 2 ? fmt(parts[parts.length-1]) : ''
+  };
+}
+
+const MAX_ROWS = 100;
+
 // Número → string formatada: 3000 → "3.000"
 function fmtN(val) {
   return val.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
@@ -381,7 +443,15 @@ async function loadFromGitHub() {
       const date = extractDate(f.name);
       const dateTs = dateToTs(date);
       state.files.push({ name: f.name, date, dateTs, isLatest: f.isLatest, count: rows.length });
-      rows.forEach(row => state.allRows.push({ ...row, _file_date: date, _file_date_ts: dateTs, _is_latest: f.isLatest }));
+      rows.forEach(row => {
+        // Parse DATA_DE_IDA into separate ida/volta for voos mode
+        if (state.mode === 'voos' && row['DATA_DE_IDA']) {
+          const parsed = parseDateField(row['DATA_DE_IDA']);
+          row['DATA_DE_IDA'] = parsed.ida;
+          row['DATA_VOLTA']  = parsed.volta || row['VOLTA'] || '';
+        }
+        state.allRows.push({ ...row, _file_date: date, _file_date_ts: dateTs, _is_latest: f.isLatest });
+      });
     }
 
     // VOOS: para cada cidade, mantém só o preço do arquivo mais recente que a contém
@@ -410,6 +480,70 @@ async function loadFromGitHub() {
     document.getElementById('loadingBox').innerHTML = `<span style="color:#e85d04">⚠️ Erro: ${err.message}</span>`;
     document.getElementById('emptyState').querySelector('p').textContent = 'Erro ao carregar: ' + err.message;
   }
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════
+// DATE PARSING — "2abr5abr" → {ida: "2026-04-02", volta: "2026-04-05"}
+// ══════════════════════════════════════════════════════════════════════════
+
+
+function parseMonthAbbr(abbr) {
+  const n = MONTH_MAP[abbr.toLowerCase()];
+  return n ? String(n).padStart(2,'0') : null;
+}
+
+// Splits "2abr5abr" into ["2abr","5abr"] — handles doubled letters like "junn","sett"
+function splitIdaVolta(raw) {
+  if (!raw || raw.trim() === '' || raw === 'Unknown' || raw === '-') return [raw, ''];
+  const s = raw.trim();
+
+  // Try to split on known month abbreviations (longest first to avoid partial match)
+  const monthKeys = Object.keys(MONTH_MAP).sort((a,b) => b.length - a.length);
+  const monthPattern = monthKeys.join('|');
+  const re = new RegExp(`^(\\d{1,2})(${monthPattern})(\\d{1,2})(${monthPattern})$`, 'i');
+  const m = s.match(re);
+  if (m) {
+    return [m[1] + m[2], m[3] + m[4]];
+  }
+
+  // Single date only (e.g. "2abr" with no return)
+  const reSingle = new RegExp(`^(\\d{1,2})(${monthPattern})$`, 'i');
+  const ms = s.match(reSingle);
+  if (ms) return [s, ''];
+
+  // Already ISO format YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return [s, ''];
+
+  return [s, ''];
+}
+
+function partToISO(part) {
+  if (!part) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(part)) return part; // already ISO
+  const monthKeys = Object.keys(MONTH_MAP).sort((a,b) => b.length - a.length);
+  const monthPattern = monthKeys.join('|');
+  const re = new RegExp(`^(\\d{1,2})(${monthPattern})$`, 'i');
+  const m = part.match(re);
+  if (!m) return part;
+  const day = m[1].padStart(2, '0');
+  const mon = parseMonthAbbr(m[2]);
+  if (!mon) return part;
+  // Determine year: if month already passed this year, use next year
+  const now = new Date();
+  let year = now.getFullYear();
+  const testDate = new Date(year, parseInt(mon)-1, parseInt(day));
+  if (testDate < now) year++;
+  return `${year}-${mon}-${day}`;
+}
+
+function parseDateField(raw) {
+  // Returns {ida: 'YYYY-MM-DD', volta: 'YYYY-MM-DD'}
+  const [idaPart, voltaPart] = splitIdaVolta(raw);
+  return {
+    ida:   partToISO(idaPart),
+    volta: voltaPart ? partToISO(voltaPart) : ''
+  };
 }
 
 // ── CSV ────────────────────────────────────────────────────────────────────
@@ -477,11 +611,12 @@ function getFiltered() {
     }
   }
 
-  return [...rows].sort((a, b) => {
+  const sorted = [...rows].sort((a, b) => {
     const va = getSortVal(a, state.sortCol), vb = getSortVal(b, state.sortCol);
     if (typeof va === 'number' && typeof vb === 'number') return state.sortAsc ? va - vb : vb - va;
     return state.sortAsc ? String(va).localeCompare(String(vb)) : String(vb).localeCompare(String(va));
   });
+  return sorted.slice(0, 100); // max 100 results shown
 }
 
 function getDests() {
@@ -565,7 +700,7 @@ function renderSortBar() {
 
 // Sem coluna VOLTA; Preços renomeado para "PREÇOS (3 PESSOAS)"; Data Busca no final
 const HEAD_H = ['CIDADE','CHECK-IN','DIAS','HOTEL','FONTE','PREÇOS (3 PESSOAS)','LINKS','DATA BUSCA'];
-const HEAD_V = ['DE','PARA','CIDADE','DATA IDA','HORÁRIO','ESCALA','PREÇO','MILHAS','LINK','DATA BUSCA'];
+const HEAD_V = ['DE','PARA','CIDADE','IDA/VOLTA','DATA IDA','DATA VOLTA','HORÁRIO','ESCALA','PREÇO','MILHAS','LINK','DATA BUSCA'];
 
 function renderTable() {
   const empty = document.getElementById('emptyState');
@@ -574,7 +709,20 @@ function renderTable() {
   empty.style.display='none'; section.style.display='block';
 
   const rows = getFiltered();
-  document.getElementById('resultCount').innerHTML = `<b>${rows.length}</b> resultados`;
+  const totalBeforeCap = (() => {
+    // count without the slice(0,100) cap — reuse same filter logic
+    let r = state.allRows;
+    const key = state.mode === 'hoteis' ? 'City' : 'PARA';
+    if (state.selectedDest !== 'ALL') r = r.filter(x => x[key] === state.selectedDest);
+    if (state.search) {
+      const q = state.search.toLowerCase();
+      if (state.mode === 'hoteis') r = r.filter(x => (x.City||'').toLowerCase().includes(q)||(x['City Name']||'').toLowerCase().includes(q)||(x.Country||'').toLowerCase().includes(q)||(x['Hotel Name']||'').toLowerCase().includes(q));
+      else r = r.filter(x => (x.PARA||'').toLowerCase().includes(q)||(x.CIDADE||'').toLowerCase().includes(q)||(x['PAÍS']||'').toLowerCase().includes(q)||(x.DE||'').toLowerCase().includes(q));
+    }
+    return r.length;
+  })();
+  const capNote = totalBeforeCap > 100 ? ` <span style="color:var(--text-dim);font-size:10px">(de ${totalBeforeCap} — filtre para ver mais)</span>` : '';
+  document.getElementById('resultCount').innerHTML = `<b>${rows.length}</b> resultados${capNote}`;
 
   const heads = state.mode === 'hoteis' ? HEAD_H : HEAD_V;
   document.getElementById('tableHead').innerHTML = '<tr>' + heads.map(h => `<th>${h}</th>`).join('') + '</tr>';
@@ -591,7 +739,7 @@ function rowH(r) {
   const fp = parsePrice(r['Final Price']), hp = parsePrice(r['Price']), ap = parsePrice(r['Air Price']);
   return `<tr>
     <td><span class="badge-dest hotel">${r.City||'?'}</span><br><small style="color:var(--text-dim)">${r['City Name']||''}</small></td>
-    <td style="font-family:var(--mono);font-size:12px">${r.Checkin_Date||'-'}</td>
+    <td style="font-family:var(--mono);font-size:12px">${fmtDate(r.Checkin_Date)}</td>
     <td style="font-family:var(--mono);text-align:center">${r['# Days']||'-'}</td>
     <td><div style="font-size:12px;line-height:1.3;max-width:160px">${r['Hotel Name']||'-'}</div></td>
     <td style="font-size:11px;color:var(--text-muted)">${r.Source||'-'}</td>
@@ -616,7 +764,9 @@ function rowV(r) {
     <td style="font-family:var(--mono);font-size:12px;font-weight:700">${r.DE||'-'}</td>
     <td><span class="badge-dest voo">${r.PARA||'?'}</span></td>
     <td><div style="font-size:12px">${r.CIDADE||'-'}</div><small style="color:var(--text-dim)">${r['PAÍS']||''}</small></td>
-    <td style="font-family:var(--mono);font-size:12px">${r.DATA_DE_IDA||'-'}</td>
+    <td>${(()=>{ const v=r.DATA_VOLTA||''; const ok=v&&v!=='-'&&v.toLowerCase()!=='unknown'; return ok?'<span style="font-size:11px;padding:2px 8px;border-radius:4px;background:#e8f0ff;color:#0052cc;font-weight:500">Ida e Volta</span>':'<span style="font-size:11px;padding:2px 8px;border-radius:4px;background:#f7f8fa;color:#5a6072">Apenas Ida</span>'; })()}</td>
+    <td style="font-family:var(--mono);font-size:12px">${fmtDate(r.DATA_DE_IDA)}</td>
+    <td style="font-family:var(--mono);font-size:12px;color:var(--text-muted)">${(()=>{ const v=r.DATA_VOLTA||''; return(!v||v==='-'||v.toLowerCase()==='unknown')?'-':fmtDate(v); })()}</td>
     <td style="font-family:var(--mono);font-size:12px">${r.HORÁRIO||'-'}</td>
     <td><span class="badge-escala ${isDireto?'direto':'escala'}">${r.ESCALA||'-'}</span></td>
     <td><div class="price-final">R$ ${fmtN(preco)}</div></td>
