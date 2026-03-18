@@ -362,15 +362,45 @@ async function loadFromGitHub() {
     // Mais recente = último da lista ordenada
     files.forEach((f, i) => { f.isLatest = i === files.length - 1; });
 
+    // Carrega todos os arquivos (tanto voos quanto hoteis)
+    const filesToLoad = files;
+
     state.files = []; state.allRows = [];
-    for (const f of files) {
+    for (const f of filesToLoad) {
       const rawUrl = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${GITHUB_BRANCH}/${f.path}`;
       const text = await (await fetch(rawUrl)).text();
-      const rows = parseCSV(text);
+      let rows = parseCSV(text);
+
+      // Remove linhas com cidade desconhecida ou vazia
+      rows = rows.filter(row => {
+        const cidade = (row['CIDADE'] || row['City Name'] || '').trim().toLowerCase();
+        const para   = (row['PARA']   || row['City']      || '').trim().toLowerCase();
+        return cidade !== 'unknown' && cidade !== '' && para !== '' && para !== '-';
+      });
+
       const date = extractDate(f.name);
       const dateTs = dateToTs(date);
       state.files.push({ name: f.name, date, dateTs, isLatest: f.isLatest, count: rows.length });
       rows.forEach(row => state.allRows.push({ ...row, _file_date: date, _file_date_ts: dateTs, _is_latest: f.isLatest }));
+    }
+
+    // VOOS: para cada cidade, mantém só o preço do arquivo mais recente que a contém
+    // Se Frankfurt só aparece no arquivo antigo → usa esse. Se Paris aparece em vários → usa o mais novo.
+    if (state.mode === 'voos') {
+      const best = {}; // key: PARA → row com maior _file_date_ts
+      for (const row of state.allRows) {
+        const cityKey = (row['PARA'] || '').trim().toUpperCase();
+        if (!cityKey) continue;
+        if (!best[cityKey] || row._file_date_ts > best[cityKey]._file_date_ts) {
+          best[cityKey] = row;
+        }
+      }
+      // Agora expande: para cada cidade, pega TODAS as linhas do arquivo mais recente que a contém
+      const latestTsPerCity = best;
+      state.allRows = state.allRows.filter(row => {
+        const cityKey = (row['PARA'] || '').trim().toUpperCase();
+        return latestTsPerCity[cityKey] && row._file_date_ts === latestTsPerCity[cityKey]._file_date_ts;
+      });
     }
 
     state.sortCol = state.mode === 'hoteis' ? 'Final Price' : 'PREÇO';
@@ -598,8 +628,9 @@ function rowV(r) {
 
 function updateStatus() {
   const label = state.mode === 'hoteis' ? 'cidades' : 'destinos';
+  const modeNote = state.mode === 'voos' ? ' · <span style="color:var(--accent-v)">último arquivo</span>' : '';
   document.getElementById('status-bar').innerHTML =
-    `<b>${state.files.length}</b> arquivo(s) · <b>${state.allRows.length}</b> registros · <b>${getDests().length}</b> ${label}`;
+    `<b>${state.files.length}</b> arquivo(s)${modeNote} · <b>${state.allRows.length}</b> registros · <b>${getDests().length}</b> ${label}`;
 }
 
 // ── ACTIONS ────────────────────────────────────────────────────────────────
