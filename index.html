@@ -65,6 +65,8 @@ header { border-bottom: 1px solid var(--border); padding: 14px 28px; display: fl
 .switch-btn:hover { border-color: var(--mode-accent); color: var(--mode-accent); }
 #status-bar { font-family: var(--mono); font-size: 11px; color: var(--text-dim); }
 #status-bar b { color: var(--mode-accent); }
+#status-bar-mobile { display: none; font-family: var(--mono); font-size: 11px; color: var(--text-dim); padding: 10px 14px; border-bottom: 1px solid var(--border); background: var(--surface); }
+#status-bar-mobile b { color: var(--mode-accent); }
 
 /* LAYOUT */
 .layout { display: grid; grid-template-columns: 210px 1fr; min-height: calc(100vh - 53px); }
@@ -168,6 +170,8 @@ td { padding: 9px 13px; vertical-align: middle; }
   aside #filesSection { order: 99; border-top: 1px solid var(--border); margin-top: 0; }
   main { padding: 14px; order: 1; }
   #filesSection { border-bottom: 1px solid var(--border); }
+  #status-bar { display: none; }
+  #status-bar-mobile { display: block; }
 }
 </style>
 </head>
@@ -213,13 +217,34 @@ td { padding: 9px 13px; vertical-align: middle; }
         </div>
       </div>
 
-      <!-- 2. FILTRAR DESTINO -->
+      <!-- 2. FILTRAR DATA -->
+      <div class="sidebar-section" id="dateSection" style="display:none">
+        <div class="collapse-header" onclick="toggleDate()">
+          <div class="sidebar-label" id="dateLabel">Filtrar data</div>
+          <span class="collapse-arrow open" id="dateArrow">▼</span>
+        </div>
+        <div id="dateFilterBody" style="margin-top:10px">
+          <div class="city-grid" id="monthGrid"></div>
+          <div id="dayGrid" style="margin-top:6px;display:none">
+            <div style="font-size:10px;color:var(--text-dim);font-family:var(--mono);margin-bottom:5px;letter-spacing:0.08em">DIAS</div>
+            <div class="city-grid" id="dayBtnGrid"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. FILTRAR DESTINO -->
       <div class="sidebar-section" id="destSection" style="display:none">
         <div class="collapse-header" onclick="toggleDest()">
           <div class="sidebar-label" id="destLabel">Filtrar destino</div>
           <span class="collapse-arrow open" id="destArrow">▼</span>
         </div>
         <div id="cityGrid" class="city-grid" style="margin-top:10px"></div>
+      </div>
+
+      <!-- 4. FILTRO ESCALA (só voos) -->
+      <div class="sidebar-section" id="escalaSection" style="display:none">
+        <div class="sidebar-label">Tipo de voo</div>
+        <div style="display:flex;flex-direction:column;gap:5px" id="escalaGrid"></div>
       </div>
 
       <!-- 3. ARQUIVOS — colapsável, por baixo -->
@@ -242,6 +267,7 @@ td { padding: 9px 13px; vertical-align: middle; }
         <div class="big">⏳</div>
         <p>Buscando arquivos no repositório...</p>
       </div>
+      <div id="status-bar-mobile"></div>
       <div id="dataSection" style="display:none">
         <div class="toolbar">
           <div class="sort-group" id="sortGroup"></div>
@@ -271,6 +297,8 @@ const PATTERN_VOOS   = '_compilado_Voos.csv';
 const state = {
   mode: 'hoteis', files: [], allRows: [],
   selectedDest: 'ALL', sortCol: '', sortAsc: true, search: '',
+  selectedMonth: 'ALL', selectedDay: 'ALL', currentPage: 0,
+  escalaFilter: 'ALL', // 'ALL' | 'direto' | 'escala'
 };
 
 // ── UTILS ──────────────────────────────────────────────────────────────────
@@ -366,7 +394,7 @@ function parseGoogleDate(raw) {
   };
 }
 
-const MAX_ROWS = 100;
+const PAGE_SIZE = 200;
 
 // Número → string formatada: 3000 → "3.000"
 function fmtN(val) {
@@ -376,6 +404,7 @@ function fmtN(val) {
 // ── LANDING ────────────────────────────────────────────────────────────────
 function enterMode(mode) {
   state.mode = mode;
+  state.selectedMonth = 'ALL'; state.selectedDay = 'ALL'; state.currentPage = 0;
   document.getElementById('landing').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   document.body.className = mode === 'voos' ? 'mode-voos' : '';
@@ -387,6 +416,8 @@ function switchMode() {
   const m = state.mode === 'hoteis' ? 'voos' : 'hoteis';
   state.mode = m; state.files = []; state.allRows = [];
   state.selectedDest = 'ALL'; state.search = '';
+  state.selectedMonth = 'ALL'; state.selectedDay = 'ALL'; state.currentPage = 0;
+  state.escalaFilter = 'ALL';
   document.getElementById('searchInput').value = '';
   document.body.className = m === 'voos' ? 'mode-voos' : '';
   updateHeader(); showLoading(); loadFromGitHub();
@@ -477,6 +508,7 @@ async function loadFromGitHub() {
 
     state.sortCol = state.mode === 'hoteis' ? 'Final Price' : 'PREÇO';
     state.sortAsc = true;
+    state.currentPage = 0;
     render();
   } catch (err) {
     document.getElementById('loadingBox').innerHTML = `<span style="color:#e85d04">⚠️ Erro: ${err.message}</span>`;
@@ -613,12 +645,38 @@ function getFiltered() {
     }
   }
 
+  // Escala filter (voos only)
+  if (state.mode === 'voos' && state.escalaFilter !== 'ALL') {
+    rows = rows.filter(r => {
+      const esc = (r.ESCALA||'').toLowerCase().trim();
+      if (state.escalaFilter === 'direto') return esc === 'direto';
+      if (state.escalaFilter === 'escala') return esc !== 'direto' && esc !== '';
+      return true;
+    });
+  }
+
+  // Date filter
+  if (state.selectedMonth !== 'ALL') {
+    const dateKey = state.mode === 'hoteis' ? 'Checkin_Date' : 'DATA_DE_IDA';
+    rows = rows.filter(r => {
+      const d = getRowDate(r, dateKey);
+      if (!d) return false;
+      if (MESES[d.getMonth()] !== state.selectedMonth) return false;
+      if (state.selectedDay !== 'ALL') {
+        if (String(d.getDate()).padStart(2,'0') !== state.selectedDay) return false;
+      }
+      return true;
+    });
+  }
+
   const sorted = [...rows].sort((a, b) => {
     const va = getSortVal(a, state.sortCol), vb = getSortVal(b, state.sortCol);
     if (typeof va === 'number' && typeof vb === 'number') return state.sortAsc ? va - vb : vb - va;
     return state.sortAsc ? String(va).localeCompare(String(vb)) : String(vb).localeCompare(String(va));
   });
-  return sorted.slice(0, 100); // max 100 results shown
+
+  const start = state.currentPage * PAGE_SIZE;
+  return { rows: sorted.slice(start, start + PAGE_SIZE), total: sorted.length };
 }
 
 function getDests() {
@@ -627,7 +685,7 @@ function getDests() {
 }
 
 // ── RENDER ─────────────────────────────────────────────────────────────────
-function render() { renderFileList(); renderDestFilter(); renderSortBar(); renderTable(); updateStatus(); }
+function render() { renderFileList(); renderDateFilter(); renderDestFilter(); renderEscalaFilter(); renderSortBar(); renderTable(); updateStatus(); }
 
 function showLoading() {
   document.getElementById('loadingBox').style.display = 'block';
@@ -689,6 +747,7 @@ const SORT_V = [
   {col:'PREÇO', label:'Preço'},
   {col:'DATA_DE_IDA', label:'Data Ida'},
   {col:'MILHAS', label:'Milhas'},
+  {col:'PARA', label:'Destino A→Z'},
 ];
 
 function renderSortBar() {
@@ -708,21 +767,12 @@ function renderTable() {
   if (!state.files.length) { empty.style.display='block'; section.style.display='none'; return; }
   empty.style.display='none'; section.style.display='block';
 
-  const rows = getFiltered();
-  const totalBeforeCap = (() => {
-    // count without the slice(0,100) cap — reuse same filter logic
-    let r = state.allRows;
-    const key = state.mode === 'hoteis' ? 'City' : 'PARA';
-    if (state.selectedDest !== 'ALL') r = r.filter(x => x[key] === state.selectedDest);
-    if (state.search) {
-      const q = state.search.toLowerCase();
-      if (state.mode === 'hoteis') r = r.filter(x => (x.City||'').toLowerCase().includes(q)||(x['City Name']||'').toLowerCase().includes(q)||(x.Country||'').toLowerCase().includes(q)||(x['Hotel Name']||'').toLowerCase().includes(q));
-      else r = r.filter(x => (x.PARA||'').toLowerCase().includes(q)||(x.CIDADE||'').toLowerCase().includes(q)||(x['PAÍS']||'').toLowerCase().includes(q)||(x.DE||'').toLowerCase().includes(q));
-    }
-    return r.length;
-  })();
-  const capNote = totalBeforeCap > 100 ? ` <span style="color:var(--text-dim);font-size:10px">(de ${totalBeforeCap} — filtre para ver mais)</span>` : '';
-  document.getElementById('resultCount').innerHTML = `<b>${rows.length}</b> resultados${capNote}`;
+  const { rows, total } = getFiltered();
+  const start = state.currentPage * PAGE_SIZE;
+  const pageInfo = total > PAGE_SIZE
+    ? ` <span style="color:var(--text-dim);font-size:10px">(${start+1}–${Math.min(start+rows.length,total)} de ${total})</span>`
+    : '';
+  document.getElementById('resultCount').innerHTML = `<b>${rows.length}</b> resultados${pageInfo}`;
 
   const heads = state.mode === 'hoteis' ? HEAD_H : HEAD_V;
   document.getElementById('tableHead').innerHTML = '<tr>' + heads.map(h => `<th>${h}</th>`).join('') + '</tr>';
@@ -733,6 +783,26 @@ function renderTable() {
     return;
   }
   tbody.innerHTML = rows.map(r => state.mode === 'hoteis' ? rowH(r) : rowV(r)).join('');
+
+  // Pagination buttons — always remove old bar first
+  const oldBar = document.getElementById('paginationBar');
+  if (oldBar) oldBar.remove();
+
+  const prevDisabled = state.currentPage === 0;
+  const nextDisabled = (state.currentPage + 1) * PAGE_SIZE >= total;
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+  const curPage = state.currentPage + 1;
+  if (totalPages > 1) {
+    const bar = document.createElement('div');
+    bar.id = 'paginationBar';
+    bar.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:10px;padding:16px;border-top:1px solid var(--border)';
+    bar.innerHTML = `
+      <button onclick="goPage(${state.currentPage-1})" ${prevDisabled?'disabled':''} style="padding:6px 14px;border:1px solid var(--border);border-radius:6px;background:#fff;cursor:${prevDisabled?'not-allowed':'pointer'};color:${prevDisabled?'var(--text-dim)':'var(--mode-accent)'};font-size:12px">← Anterior</button>
+      <span style="font-family:var(--mono);font-size:11px;color:var(--text-muted)">pág ${curPage} de ${totalPages}</span>
+      <button onclick="goPage(${state.currentPage+1})" ${nextDisabled?'disabled':''} style="padding:6px 14px;border:1px solid var(--border);border-radius:6px;background:${nextDisabled?'#fff':'var(--mode-accent)'};cursor:${nextDisabled?'not-allowed':'pointer'};color:${nextDisabled?'var(--text-dim)':'#fff'};font-size:12px;font-weight:500">Próximos ${PAGE_SIZE} →</button>
+    `;
+    document.querySelector('.table-wrap').insertAdjacentElement('afterend', bar);
+  }
 }
 
 function rowH(r) {
@@ -779,18 +849,19 @@ function rowV(r) {
 function updateStatus() {
   const label = state.mode === 'hoteis' ? 'cidades' : 'destinos';
   const modeNote = state.mode === 'voos' ? ' · <span style="color:var(--accent-v)">último arquivo</span>' : '';
-  document.getElementById('status-bar').innerHTML =
-    `<b>${state.files.length}</b> arquivo(s)${modeNote} · <b>${state.allRows.length}</b> registros · <b>${getDests().length}</b> ${label}`;
+  const statusHTML = `<b>${state.files.length}</b> arquivo(s)${modeNote} · <b>${state.allRows.length}</b> registros · <b>${getDests().length}</b> ${label}`;
+  document.getElementById('status-bar').innerHTML = statusHTML;
+  document.getElementById('status-bar-mobile').innerHTML = statusHTML;
 }
 
 // ── ACTIONS ────────────────────────────────────────────────────────────────
-function selectDest(d) { state.selectedDest = d; render(); }
+function selectDest(d) { state.selectedDest = d; state.currentPage = 0; render(); }
 function setSort(col) {
   if (state.sortCol === col) state.sortAsc = !state.sortAsc;
   else { state.sortCol = col; state.sortAsc = true; }
   renderSortBar(); renderTable();
 }
-document.getElementById('searchInput').addEventListener('input', e => { state.search = e.target.value; renderTable(); });
+document.getElementById('searchInput').addEventListener('input', e => { state.search = e.target.value; state.currentPage = 0; renderTable(); });
 
 function toggleDest() {
   const section = document.getElementById('destSection');
@@ -801,11 +872,157 @@ function toggleDest() {
   arrow.classList.toggle('open', section._open);
 }
 
+
+// ── DATE FILTER HELPERS ────────────────────────────────────────────────────
+function getRowDate(row, key) {
+  const raw = row[key] || '';
+  if (!raw || raw === '-') return null;
+  // Already formatted "02/abr/2026"
+  if (/^\d{2}\/[a-z]{3}\/\d{4}$/i.test(raw)) {
+    const [d, m, y] = raw.split('/');
+    const mi = MESES.indexOf(m.toLowerCase());
+    if (mi < 0) return null;
+    return new Date(parseInt(y), mi, parseInt(d));
+  }
+  // ISO
+  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return new Date(raw.substring(0,10)+'T12:00:00');
+  // Google format "2abr5abr" — use parsed _ida_fmt if available
+  const fmt = row['_ida_fmt'] || '';
+  if (/^\d{2}\/[a-z]{3}\/\d{4}$/i.test(fmt)) {
+    const [d, m, y] = fmt.split('/');
+    const mi = MESES.indexOf(m.toLowerCase());
+    if (mi < 0) return null;
+    return new Date(parseInt(y), mi, parseInt(d));
+  }
+  return null;
+}
+
+function getAvailableMonths() {
+  const dateKey = state.mode === 'hoteis' ? 'Checkin_Date' : 'DATA_DE_IDA';
+  const months = new Set();
+  for (const row of state.allRows) {
+    const d = getRowDate(row, dateKey);
+    if (d) months.add(MESES[d.getMonth()] + '/' + d.getFullYear());
+  }
+  return [...months].sort((a, b) => {
+    const [ma, ya] = a.split('/'); const [mb, yb] = b.split('/');
+    const da = new Date(ya, MESES.indexOf(ma), 1);
+    const db = new Date(yb, MESES.indexOf(mb), 1);
+    return da - db;
+  });
+}
+
+function getAvailableDays(month) {
+  const dateKey = state.mode === 'hoteis' ? 'Checkin_Date' : 'DATA_DE_IDA';
+  const days = new Set();
+  for (const row of state.allRows) {
+    const d = getRowDate(row, dateKey);
+    if (!d) continue;
+    const mon = MESES[d.getMonth()] + '/' + d.getFullYear();
+    if (mon === month) days.add(String(d.getDate()).padStart(2,'0'));
+  }
+  return [...days].sort();
+}
+
+function renderDateFilter() {
+  const section = document.getElementById('dateSection');
+  const months = getAvailableMonths();
+  if (!months.length) { section.style.display = 'none'; return; }
+  section.style.display = 'block';
+
+  // Month buttons
+  const mg = document.getElementById('monthGrid');
+  mg.innerHTML =
+    `<button class="city-btn all-btn ${state.selectedMonth==='ALL'?'active':''}" onclick="selectMonth('ALL')">TODOS</button>` +
+    months.map(m => {
+      const [mon, yr] = m.split('/');
+      return `<button class="city-btn ${state.selectedMonth===mon?'active':''}" onclick="selectMonth('${mon}')">${mon}<br><span style="font-size:9px;opacity:0.6">${yr}</span></button>`;
+    }).join('');
+
+  // Day buttons — only show if month selected
+  const dg = document.getElementById('dayGrid');
+  const dbg = document.getElementById('dayBtnGrid');
+  if (state.selectedMonth === 'ALL') {
+    dg.style.display = 'none';
+  } else {
+    const selMonYear = months.find(m => m.startsWith(state.selectedMonth+'/')) || '';
+    const days = getAvailableDays(selMonYear);
+    dg.style.display = days.length ? '' : 'none';
+    dbg.innerHTML =
+      `<button class="city-btn all-btn ${state.selectedDay==='ALL'?'active':''}" onclick="selectDay('ALL')">TODOS</button>` +
+      days.map(d => `<button class="city-btn ${state.selectedDay===d?'active':''}" onclick="selectDay('${d}')">${d}</button>`).join('');
+  }
+}
+
+function selectMonth(mon) {
+  state.selectedMonth = mon;
+  state.selectedDay = 'ALL';
+  state.currentPage = 0;
+  renderDateFilter();
+  renderTable();
+  updateStatus();
+}
+
+function selectDay(day) {
+  state.selectedDay = day;
+  state.currentPage = 0;
+  renderTable();
+  updateStatus();
+}
+
+function toggleDate() {
+  const body = document.getElementById('dateFilterBody');
+  const arrow = document.getElementById('dateArrow');
+  const open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : '';
+  if (arrow) arrow.classList.toggle('open', !open);
+}
+
+function goPage(page) {
+  state.currentPage = page;
+  renderTable();
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+
+function renderEscalaFilter() {
+  const section = document.getElementById('escalaSection');
+  if (state.mode !== 'voos') { section.style.display = 'none'; return; }
+  section.style.display = 'block';
+  const opts = [
+    { val: 'ALL',    label: '✈️ Todos os voos',  desc: '' },
+    { val: 'direto', label: '🟢 Apenas Diretos',  desc: '' },
+    { val: 'escala', label: '🟡 Com Escala',       desc: '' },
+  ];
+  document.getElementById('escalaGrid').innerHTML = opts.map(o => `
+    <button onclick="setEscala('${o.val}')" style="
+      text-align:left;padding:7px 10px;border-radius:6px;font-size:12px;cursor:pointer;
+      border:1.5px solid ${state.escalaFilter===o.val ? 'var(--mode-accent)' : 'var(--border)'};
+      background:${state.escalaFilter===o.val ? 'var(--mode-light)' : '#fff'};
+      color:${state.escalaFilter===o.val ? 'var(--mode-accent)' : 'var(--text-muted)'};
+      font-weight:${state.escalaFilter===o.val ? '600' : '400'};
+    ">${o.label}</button>
+  `).join('');
+}
+
+function setEscala(val) {
+  state.escalaFilter = val;
+  state.currentPage = 0;
+  renderEscalaFilter();
+  renderTable();
+  updateStatus();
+}
+
 window.selectDest = selectDest;
 window.setSort = setSort;
 window.switchMode = switchMode;
 window.enterMode = enterMode;
 window.toggleDest = toggleDest;
+window.toggleDate = toggleDate;
+window.setEscala = setEscala;
+window.selectMonth = selectMonth;
+window.selectDay = selectDay;
+window.goPage = goPage;
 window.toggleArquivos = toggleArquivos;
 </script>
 </body>
