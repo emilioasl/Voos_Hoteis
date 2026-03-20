@@ -221,9 +221,9 @@ td { padding: 9px 13px; vertical-align: middle; }
       <div class="sidebar-section" id="dateSection" style="display:none">
         <div class="collapse-header" onclick="toggleDate()">
           <div class="sidebar-label" id="dateLabel">Filtrar data</div>
-          <span class="collapse-arrow open" id="dateArrow">▼</span>
+          <span class="collapse-arrow" id="dateArrow">▼</span>
         </div>
-        <div id="dateFilterBody" style="margin-top:10px">
+        <div id="dateFilterBody" style="margin-top:10px;display:none">
           <div class="city-grid" id="monthGrid"></div>
           <div id="dayGrid" style="margin-top:6px;display:none">
             <div style="font-size:10px;color:var(--text-dim);font-family:var(--mono);margin-bottom:5px;letter-spacing:0.08em">DIAS</div>
@@ -236,15 +236,20 @@ td { padding: 9px 13px; vertical-align: middle; }
       <div class="sidebar-section" id="destSection" style="display:none">
         <div class="collapse-header" onclick="toggleDest()">
           <div class="sidebar-label" id="destLabel">Filtrar destino</div>
-          <span class="collapse-arrow open" id="destArrow">▼</span>
+          <span class="collapse-arrow" id="destArrow">▼</span>
         </div>
         <div id="cityGrid" class="city-grid" style="margin-top:10px"></div>
       </div>
 
-      <!-- 4. FILTRO ESCALA (só voos) -->
-      <div class="sidebar-section" id="escalaSection" style="display:none">
-        <div class="sidebar-label">Tipo de voo</div>
-        <div style="display:flex;flex-direction:column;gap:5px" id="escalaGrid"></div>
+      <!-- 5. FERIADOS -->
+      <div class="sidebar-section" id="feriadosSection">
+        <div class="collapse-header" onclick="toggleFeriados()">
+          <div class="sidebar-label">🗓️ Feriados</div>
+          <span class="collapse-arrow" id="feriadosArrow">▼</span>
+        </div>
+        <div id="feriadosBody" style="margin-top:10px;display:none">
+          <div style="display:flex;flex-direction:column;gap:5px" id="feriadosGrid"></div>
+        </div>
       </div>
 
       <!-- 3. ARQUIVOS — colapsável, por baixo -->
@@ -298,7 +303,7 @@ const state = {
   mode: 'hoteis', files: [], allRows: [],
   selectedDest: 'ALL', sortCol: '', sortAsc: true, search: '',
   selectedMonth: 'ALL', selectedDay: 'ALL', currentPage: 0,
-  escalaFilter: 'ALL', // 'ALL' | 'direto' | 'escala'
+  feriadoFilter: 'ALL',
 };
 
 // ── UTILS ──────────────────────────────────────────────────────────────────
@@ -336,6 +341,39 @@ function parsePrice(str) {
 
 // ── DATE UTILS ────────────────────────────────────────────────────────────
 const MESES = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+
+// ── FERIADOS ──────────────────────────────────────────────────────────────
+const FERIADOS = [
+  { name: '🟡 Paixão/Páscoa (Sex)',  ranges: [{sd:2,sm:4,ed:5,em:4},{sd:3,sm:4,ed:5,em:4}] },
+  { name: '🟡 Tiradentes (Ter)',     ranges: [{sd:17,sm:4,ed:21,em:4},{sd:18,sm:4,ed:21,em:4}] },
+  { name: '🟡 Trabalho (Sex)',       ranges: [{sd:30,sm:4,ed:3,em:5},{sd:1,sm:5,ed:3,em:5}] },
+  { name: '🟡 Corpus (Qui)',         ranges: [{sd:3,sm:6,ed:7,em:6},{sd:4,sm:6,ed:7,em:6}] },
+  { name: '🟡 Independência (Seg)',  ranges: [{sd:4,sm:9,ed:7,em:9},{sd:5,sm:9,ed:7,em:9}] },
+  { name: '🟡 Aparecida (Seg)',      ranges: [{sd:9,sm:10,ed:12,em:10},{sd:10,sm:10,ed:12,em:10}] },
+  { name: '🟡 Finados (Seg)',        ranges: [{sd:30,sm:10,ed:2,em:11},{sd:31,sm:10,ed:2,em:11}] },
+  { name: '🟡 Negros (Sex)',         ranges: [{sd:19,sm:11,ed:22,em:11},{sd:20,sm:11,ed:22,em:11}] },
+  { name: '🟡 9 de Julho',           ranges: [{sd:8,sm:7,ed:12,em:11},{sd:9,sm:7,ed:12,em:11}] },
+  { name: '🎄 Natal/Ano Novo',       ranges: [{sd:18,sm:12,ed:3,em:1},{sd:19,sm:12,ed:3,em:1},{sd:20,sm:12,ed:3,em:1}] },
+  { name: '🎂 Niver São Paulo',      ranges: [{sd:20,sm:12,ed:3,em:1},{sd:22,sm:1,ed:25,em:1}] },
+];
+
+function midnightOf(d) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function dateInFeriado(date, feriado) {
+  const d = midnightOf(date);
+  const years = [d.getFullYear() - 1, d.getFullYear(), d.getFullYear() + 1];
+  for (const r of feriado.ranges) {
+    for (const baseYear of years) {
+      const start = new Date(baseYear, r.sm - 1, r.sd);
+      const endYear = r.em < r.sm ? baseYear + 1 : baseYear;
+      const end = new Date(endYear, r.em - 1, r.ed);
+      if (d >= start && d <= end) return true;
+    }
+  }
+  return false;
+}
 const MONTH_MAP = {
   jan:1,jann:1, fev:2, mar:3, abr:4, mai:5,
   jun:6,junn:6, jul:7,jull:7, ago:8,
@@ -405,6 +443,7 @@ function fmtN(val) {
 function enterMode(mode) {
   state.mode = mode;
   state.selectedMonth = 'ALL'; state.selectedDay = 'ALL'; state.currentPage = 0;
+  state.feriadoFilter = 'ALL';
   document.getElementById('landing').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   document.body.className = mode === 'voos' ? 'mode-voos' : '';
@@ -417,7 +456,7 @@ function switchMode() {
   state.mode = m; state.files = []; state.allRows = [];
   state.selectedDest = 'ALL'; state.search = '';
   state.selectedMonth = 'ALL'; state.selectedDay = 'ALL'; state.currentPage = 0;
-  state.escalaFilter = 'ALL';
+  state.feriadoFilter = 'ALL';
   document.getElementById('searchInput').value = '';
   document.body.className = m === 'voos' ? 'mode-voos' : '';
   updateHeader(); showLoading(); loadFromGitHub();
@@ -645,14 +684,17 @@ function getFiltered() {
     }
   }
 
-  // Escala filter (voos only)
-  if (state.mode === 'voos' && state.escalaFilter !== 'ALL') {
-    rows = rows.filter(r => {
-      const esc = (r.ESCALA||'').toLowerCase().trim();
-      if (state.escalaFilter === 'direto') return esc === 'direto';
-      if (state.escalaFilter === 'escala') return esc !== 'direto' && esc !== '';
-      return true;
-    });
+  // Feriado filter
+  if (state.feriadoFilter !== 'ALL') {
+    const feriado = FERIADOS.find(f => f.name === state.feriadoFilter);
+    if (feriado) {
+      const dateKey = state.mode === 'hoteis' ? 'Checkin_Date' : 'DATA_DE_IDA';
+      rows = rows.filter(r => {
+        const d = getRowDate(r, dateKey);
+        if (!d) return false;
+        return dateInFeriado(d, feriado);
+      });
+    }
   }
 
   // Date filter
@@ -685,7 +727,7 @@ function getDests() {
 }
 
 // ── RENDER ─────────────────────────────────────────────────────────────────
-function render() { renderFileList(); renderDateFilter(); renderDestFilter(); renderEscalaFilter(); renderSortBar(); renderTable(); updateStatus(); }
+function render() { renderFileList(); renderDateFilter(); renderDestFilter(); renderFeriadosFilter(); renderSortBar(); renderTable(); updateStatus(); }
 
 function showLoading() {
   document.getElementById('loadingBox').style.display = 'block';
@@ -930,6 +972,17 @@ function renderDateFilter() {
   if (!months.length) { section.style.display = 'none'; return; }
   section.style.display = 'block';
 
+  // On mobile start collapsed, on desktop start open
+  const isMobile = window.innerWidth <= 768;
+  if (!section._initialized) {
+    section._initialized = true;
+    section._open = !isMobile;
+    const body = document.getElementById('dateFilterBody');
+    const arrow = document.getElementById('dateArrow');
+    body.style.display = section._open ? '' : 'none';
+    if (arrow) arrow.classList.toggle('open', section._open);
+  }
+
   // Month buttons
   const mg = document.getElementById('monthGrid');
   mg.innerHTML =
@@ -971,11 +1024,12 @@ function selectDay(day) {
 }
 
 function toggleDate() {
+  const section = document.getElementById('dateSection');
   const body = document.getElementById('dateFilterBody');
   const arrow = document.getElementById('dateArrow');
-  const open = body.style.display !== 'none';
-  body.style.display = open ? 'none' : '';
-  if (arrow) arrow.classList.toggle('open', !open);
+  section._open = !section._open;
+  body.style.display = section._open ? '' : 'none';
+  if (arrow) arrow.classList.toggle('open', section._open);
 }
 
 function goPage(page) {
@@ -985,32 +1039,56 @@ function goPage(page) {
 }
 
 
-function renderEscalaFilter() {
-  const section = document.getElementById('escalaSection');
-  if (state.mode !== 'voos') { section.style.display = 'none'; return; }
-  section.style.display = 'block';
-  const opts = [
-    { val: 'ALL',    label: '✈️ Todos os voos',  desc: '' },
-    { val: 'direto', label: '🟢 Apenas Diretos',  desc: '' },
-    { val: 'escala', label: '🟡 Com Escala',       desc: '' },
-  ];
-  document.getElementById('escalaGrid').innerHTML = opts.map(o => `
-    <button onclick="setEscala('${o.val}')" style="
+
+function renderFeriadosFilter() {
+  initFeriadosOpen();
+  const grid = document.getElementById('feriadosGrid');
+  if (!grid) return;
+  const opts = [{ name: 'ALL', label: '📅 Todas as datas' }, ...FERIADOS];
+  grid.innerHTML = opts.map((o, i) => {
+    const isActive = state.feriadoFilter === o.name;
+    return `<button data-fidx="${i}" style="
       text-align:left;padding:7px 10px;border-radius:6px;font-size:12px;cursor:pointer;
-      border:1.5px solid ${state.escalaFilter===o.val ? 'var(--mode-accent)' : 'var(--border)'};
-      background:${state.escalaFilter===o.val ? 'var(--mode-light)' : '#fff'};
-      color:${state.escalaFilter===o.val ? 'var(--mode-accent)' : 'var(--text-muted)'};
-      font-weight:${state.escalaFilter===o.val ? '600' : '400'};
-    ">${o.label}</button>
-  `).join('');
+      border:1.5px solid ${isActive ? 'var(--mode-accent)' : 'var(--border)'};
+      background:${isActive ? 'var(--mode-light)' : '#fff'};
+      color:${isActive ? 'var(--mode-accent)' : 'var(--text-muted)'};
+      font-weight:${isActive ? '600' : '400'};
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    ">${o.label || o.name}</button>`;
+  }).join('');
+  grid.querySelectorAll('button[data-fidx]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.getAttribute('data-fidx'));
+      const name = idx === 0 ? 'ALL' : FERIADOS[idx - 1].name;
+      setFeriado(name);
+    });
+  });
 }
 
-function setEscala(val) {
-  state.escalaFilter = val;
+function setFeriado(name) {
+  state.feriadoFilter = name;
   state.currentPage = 0;
-  renderEscalaFilter();
+  renderFeriadosFilter();
   renderTable();
   updateStatus();
+}
+
+let feriadosOpen = null; // null = not yet initialized
+function toggleFeriados() {
+  feriadosOpen = !feriadosOpen;
+  const body = document.getElementById('feriadosBody');
+  const arrow = document.getElementById('feriadosArrow');
+  body.style.display = feriadosOpen ? '' : 'none';
+  if (arrow) arrow.classList.toggle('open', feriadosOpen);
+}
+
+function initFeriadosOpen() {
+  if (feriadosOpen !== null) return;
+  feriadosOpen = window.innerWidth > 768;
+  const body = document.getElementById('feriadosBody');
+  const arrow = document.getElementById('feriadosArrow');
+  body.style.display = feriadosOpen ? '' : 'none';
+  if (arrow) arrow.classList.toggle('open', feriadosOpen);
 }
 
 window.selectDest = selectDest;
@@ -1019,7 +1097,8 @@ window.switchMode = switchMode;
 window.enterMode = enterMode;
 window.toggleDest = toggleDest;
 window.toggleDate = toggleDate;
-window.setEscala = setEscala;
+window.toggleFeriados = toggleFeriados;
+window.setFeriado = setFeriado;
 window.selectMonth = selectMonth;
 window.selectDay = selectDay;
 window.goPage = goPage;
