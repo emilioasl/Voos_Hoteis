@@ -217,7 +217,18 @@ td { padding: 9px 13px; vertical-align: middle; }
         </div>
       </div>
 
-      <!-- 2. FILTRAR DATA -->
+      <!-- 2. FERIADOS -->
+      <div class="sidebar-section" id="feriadosSection">
+        <div class="collapse-header" onclick="toggleFeriados()">
+          <div class="sidebar-label">🗓️ Feriados</div>
+          <span class="collapse-arrow" id="feriadosArrow">▼</span>
+        </div>
+        <div id="feriadosBody" style="margin-top:10px;display:none">
+          <div style="display:flex;flex-direction:column;gap:5px" id="feriadosGrid"></div>
+        </div>
+      </div>
+
+      <!-- 3. FILTRAR DATA -->
       <div class="sidebar-section" id="dateSection" style="display:none">
         <div class="collapse-header" onclick="toggleDate()">
           <div class="sidebar-label" id="dateLabel">Filtrar data</div>
@@ -232,24 +243,13 @@ td { padding: 9px 13px; vertical-align: middle; }
         </div>
       </div>
 
-      <!-- 3. FILTRAR DESTINO -->
+      <!-- 4. FILTRAR DESTINO -->
       <div class="sidebar-section" id="destSection" style="display:none">
         <div class="collapse-header" onclick="toggleDest()">
           <div class="sidebar-label" id="destLabel">Filtrar destino</div>
           <span class="collapse-arrow" id="destArrow">▼</span>
         </div>
         <div id="cityGrid" class="city-grid" style="margin-top:10px"></div>
-      </div>
-
-      <!-- 5. FERIADOS -->
-      <div class="sidebar-section" id="feriadosSection">
-        <div class="collapse-header" onclick="toggleFeriados()">
-          <div class="sidebar-label">🗓️ Feriados</div>
-          <span class="collapse-arrow" id="feriadosArrow">▼</span>
-        </div>
-        <div id="feriadosBody" style="margin-top:10px;display:none">
-          <div style="display:flex;flex-direction:column;gap:5px" id="feriadosGrid"></div>
-        </div>
       </div>
 
       <!-- 3. ARQUIVOS — colapsável, por baixo -->
@@ -355,6 +355,8 @@ const FERIADOS = [
   { name: '🟡 9 de Julho',           ranges: [{sd:8,sm:7,ed:12,em:11},{sd:9,sm:7,ed:12,em:11}] },
   { name: '🎄 Natal/Ano Novo',       ranges: [{sd:18,sm:12,ed:3,em:1},{sd:19,sm:12,ed:3,em:1},{sd:20,sm:12,ed:3,em:1}] },
   { name: '🎂 Niver São Paulo',      ranges: [{sd:20,sm:12,ed:3,em:1},{sd:22,sm:1,ed:25,em:1}] },
+  { name: '🎭 2027 Carnaval Full',     ranges: [{sd:5,sm:2,ed:14,em:2},{sd:6,sm:2,ed:14,em:2},{sd:7,sm:2,ed:14,em:2}] },
+  { name: '🎭 2027 Carnaval Metade',        ranges: [{sd:5,sm:2,ed:10,em:2},{sd:6,sm:2,ed:10,em:2}] },
 ];
 
 function midnightOf(d) {
@@ -784,12 +786,14 @@ const SORT_H = [
   {col:'Final Price', label:'Preço Total'},
   {col:'Checkin_Date', label:'Check-in'},
   {col:'# Days', label:'Dias'},
+  {col:'_file_date', label:'Data Busca'},
 ];
 const SORT_V = [
   {col:'PREÇO', label:'Preço'},
   {col:'DATA_DE_IDA', label:'Data Ida'},
   {col:'MILHAS', label:'Milhas'},
   {col:'PARA', label:'Destino A→Z'},
+  {col:'_file_date', label:'Data Busca'},
 ];
 
 function renderSortBar() {
