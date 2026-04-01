@@ -228,6 +228,12 @@ td { padding: 9px 13px; vertical-align: middle; }
         </div>
       </div>
 
+      <!-- REGIAO: Brasil / Exterior -->
+      <div class="sidebar-section" id="regiaoSection">
+        <div class="sidebar-label">🌍 Região</div>
+        <div style="display:flex;flex-direction:column;gap:5px;margin-top:10px" id="regiaoGrid"></div>
+      </div>
+
       <!-- 3. FILTRAR DATA -->
       <div class="sidebar-section" id="dateSection" style="display:none">
         <div class="collapse-header" onclick="toggleDate()">
@@ -243,13 +249,15 @@ td { padding: 9px 13px; vertical-align: middle; }
         </div>
       </div>
 
-      <!-- 4. FILTRAR DESTINO -->
-      <div class="sidebar-section" id="destSection" style="display:none">
-        <div class="collapse-header" onclick="toggleDest()">
-          <div class="sidebar-label" id="destLabel">Filtrar destino</div>
-          <span class="collapse-arrow" id="destArrow">▼</span>
+      <!-- FILTRO DIAS -->
+      <div class="sidebar-section" id="diasFilterSection" style="display:none">
+        <div class="collapse-header" onclick="toggleDiasFilter()">
+          <div class="sidebar-label">📆 Duração (dias)</div>
+          <span class="collapse-arrow open" id="diasFilterArrow">▼</span>
         </div>
-        <div id="cityGrid" class="city-grid" style="margin-top:10px"></div>
+        <div id="diasFilterBody" style="margin-top:10px">
+          <div class="city-grid" id="diasFilterGrid"></div>
+        </div>
       </div>
 
       <!-- 3. ARQUIVOS — colapsável, por baixo -->
@@ -304,6 +312,8 @@ const state = {
   selectedDest: 'ALL', sortCol: '', sortAsc: true, search: '',
   selectedMonth: 'ALL', selectedDay: 'ALL', currentPage: 0,
   feriadoFilter: 'ALL',
+  regiaoFilter: 'ALL',
+  diasFilter: 'ALL', // 'ALL' | number of days as string
 };
 
 // ── UTILS ──────────────────────────────────────────────────────────────────
@@ -342,6 +352,422 @@ function parsePrice(str) {
 // ── DATE UTILS ────────────────────────────────────────────────────────────
 const MESES = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
 
+// ── SEARCH ALIASES (PT ↔ EN) ──────────────────────────────────────────────
+const SEARCH_ALIASES = {
+  'accra': ['acra'],
+  'acra': ['accra'],
+  'alemanha': ['germany'],
+  'algeria': ['argelia', 'argélia'],
+  'ama': ['amman'],
+  'amman': ['ama', 'amã'],
+  'amsterdam': ['amsterdã'],
+  'amsterdã': ['amsterdam'],
+  'amã': ['amman'],
+  'ancara': ['ankara'],
+  'ankara': ['ancara'],
+  'antalia': ['antalya'],
+  'antalya': ['antalia', 'antália'],
+  'antália': ['antalya'],
+  'argelia': ['algeria'],
+  'argélia': ['algeria'],
+  'assua': ['aswan'],
+  'assuncao': ['asuncion'],
+  'assunção': ['asuncion'],
+  'asuncion': ['assuncao', 'assunção'],
+  'aswan': ['assua', 'assuã'],
+  'assuã': ['aswan'],
+  'athens': ['atenas'],
+  'atenas': ['athens'],
+  'austria': ['áustria'],
+  'áustria': ['austria'],
+  'bagda': ['baghdad'],
+  'bagdá': ['baghdad'],
+  'baghdad': ['bagda', 'bagdá'],
+  'baku': ['baku'],
+  'bangkok': ['bangcoc'],
+  'bangcoc': ['bangkok'],
+  'barcelona': ['barcelona'],
+  'basel': ['basileia'],
+  'basileia': ['basel'],
+  'beijing': ['pequim'],
+  'beirut': ['beirute'],
+  'beirute': ['beirut'],
+  'belem': ['belém'],
+  'belém': ['belem'],
+  'belgica': ['belgium'],
+  'belgium': ['belgica', 'bélgica'],
+  'bélgica': ['belgium'],
+  'berlin': ['berlim'],
+  'berlim': ['berlin'],
+  'bogota': ['bogotá'],
+  'bogotá': ['bogota'],
+  'bologna': ['bolonha'],
+  'bolonha': ['bologna'],
+  'bombaim': ['mumbai'],
+  'bordeaux': ['bordéus'],
+  'bordeus': ['bordeaux'],
+  'bordéus': ['bordeaux'],
+  'bora bora': ['bora bora'],
+  'brasilia': ['brasília'],
+  'brasília': ['brasilia'],
+  'brussels': ['bruxelas'],
+  'bruxelas': ['brussels'],
+  'bucharest': ['bucareste'],
+  'bucareste': ['bucharest'],
+  'budapest': ['budapeste'],
+  'budapeste': ['budapest'],
+  'bulgaria': ['bulgária'],
+  'bulgária': ['bulgaria'],
+  'calcuta': ['kolkata'],
+  'calcutá': ['kolkata'],
+  'canada': ['canadá'],
+  'canadá': ['canada'],
+  'cancun': ['cancún'],
+  'cancún': ['cancun'],
+  'cantao': ['guangzhou'],
+  'cantão': ['guangzhou'],
+  'cape town': ['cidade do cabo'],
+  'carachi': ['karachi'],
+  'cayenne': ['caiena'],
+  'caiena': ['cayenne'],
+  'chennai': ['chennai'],
+  'chicago': ['chicago'],
+  'chipre': ['cyprus'],
+  'cidade do cabo': ['cape town'],
+  'cidade do mexico': ['mexico city'],
+  'cidade do méxico': ['mexico city'],
+  'cidade da guatemala': ['guatemala city'],
+  'cidade do panama': ['panama city'],
+  'cidade do panamá': ['panama city'],
+  'cologne': ['colônia'],
+  'colombo': ['colombo'],
+  'colonia': ['cologne'],
+  'colônia': ['cologne'],
+  'copenhagen': ['copenhague'],
+  'copenhague': ['copenhagen'],
+  'coreia do sul': ['south korea'],
+  'coréia do sul': ['south korea'],
+  'croatia': ['croácia'],
+  'croacia': ['croatia'],
+  'croácia': ['croatia'],
+  'cuiaba': ['cuiabá'],
+  'cuiabá': ['cuiaba'],
+  'cyprus': ['chipre'],
+  'dar es salaam': ['dar es salaam'],
+  'denmark': ['dinamarca'],
+  'dhaka': ['daca'],
+  'daca': ['dhaka'],
+  'dinamarca': ['denmark'],
+  'doha': ['doha'],
+  'dubai': ['dubai'],
+  'dusseldorf': ['düsseldorf'],
+  'düsseldorf': ['dusseldorf'],
+  'easter island': ['ilha de páscoa', 'ilha de pascoa'],
+  'egypt': ['egito'],
+  'egito': ['egypt'],
+  'emirados arabes': ['united arab emirates'],
+  'emirados árabes': ['united arab emirates'],
+  'eslovaquia': ['slovakia'],
+  'eslováquia': ['slovakia'],
+  'eslovenia': ['slovenia'],
+  'eslovênia': ['slovenia'],
+  'espanha': ['spain'],
+  'estonia': ['estônia'],
+  'estônia': ['estonia'],
+  'etiopia': ['ethiopia'],
+  'etiópia': ['ethiopia'],
+  'ethiopia': ['etiopia', 'etiópia'],
+  'estrasburgo': ['strasbourg'],
+  'filadelfia': ['philadelphia'],
+  'filadélfia': ['philadelphia'],
+  'filipinas': ['philippines'],
+  'finland': ['finlândia'],
+  'finlandia': ['finland'],
+  'finlândia': ['finland'],
+  'florence': ['florença'],
+  'florenca': ['florence'],
+  'florença': ['florence'],
+  'florianopolis': ['florianópolis'],
+  'florianópolis': ['florianopolis'],
+  'foz do iguacu': ['foz do iguaçu'],
+  'foz do iguaçu': ['foz do iguacu'],
+  'franca': ['france'],
+  'france': ['franca', 'frança'],
+  'frankfurt': ['frankfurt am main'],
+  'frankfurt am main': ['frankfurt'],
+  'frança': ['france'],
+  'geneva': ['genebra'],
+  'genebra': ['geneva'],
+  'germany': ['alemanha'],
+  'goiania': ['goiânia'],
+  'goiânia': ['goiania'],
+  'gothenburg': ['gotemburgo'],
+  'gotemburgo': ['gothenburg'],
+  'greece': ['grécia'],
+  'grecia': ['grécia'],
+  'grécia': ['greece'],
+  'guangzhou': ['cantao', 'cantão'],
+  'guatemala city': ['cidade da guatemala'],
+  'hamburg': ['hamburgo'],
+  'hamburgo': ['hamburg'],
+  'hanoi': ['hanói'],
+  'hanói': ['hanoi'],
+  'havana': ['havana'],
+  'helsinki': ['helsinque'],
+  'helsinque': ['helsinki'],
+  'ho chi minh city': ['cidade de ho chi minh'],
+  'cidade de ho chi minh': ['ho chi minh city'],
+  'holanda': ['netherlands'],
+  'hong kong': ['hong kong'],
+  'hungria': ['hungary'],
+  'hungary': ['hungria'],
+  'iceland': ['islândia'],
+  'india': ['índia'],
+  'indonesia': ['indonésia'],
+  'indonésia': ['indonesia'],
+  'índia': ['india'],
+  'ireland': ['irlanda'],
+  'irlanda': ['ireland'],
+  'islamabade': ['islamabad'],
+  'islamabad': ['islamabade'],
+  'islândia': ['iceland'],
+  'istanbul': ['istambul'],
+  'istambul': ['istanbul'],
+  'italy': ['itália'],
+  'itália': ['italy'],
+  'jacarta': ['jakarta'],
+  'jakarta': ['jacarta'],
+  'japan': ['japão'],
+  'japao': ['japan'],
+  'japão': ['japan'],
+  'jeda': ['jeddah'],
+  'jedá': ['jeddah'],
+  'jeddah': ['jeda', 'jedá'],
+  'johannesburg': ['johanesburgo', 'johannesburgo'],
+  'johanesburgo': ['johannesburg'],
+  'joao pessoa': ['joão pessoa'],
+  'joão pessoa': ['joao pessoa'],
+  'jordan': ['jordânia'],
+  'jordania': ['jordan'],
+  'jordânia': ['jordan'],
+  'karachi': ['carachi'],
+  'kathmandu': ['katmandu'],
+  'katmandu': ['kathmandu'],
+  'kingston': ['kingston'],
+  'kolkata': ['calcuta', 'calcutá'],
+  'kuala lumpur': ['território federal de kuala lumpur'],
+  'lagos': ['lagos'],
+  'lahore': ['laore'],
+  'laore': ['lahore'],
+  'las vegas': ['las vegas'],
+  'la paz': ['la paz'],
+  'leipzig': ['lípsia'],
+  'lipsia': ['leipzig'],
+  'lípsia': ['leipzig'],
+  'lisbon': ['lisboa'],
+  'lisboa': ['lisbon'],
+  'london': ['londres'],
+  'longyearbyen': ['longyearbyen'],
+  'londres': ['london'],
+  'los angeles': ['los angeles'],
+  'luanda': ['luanda'],
+  'luang prabang': ['luang prabang'],
+  'lugano': ['lugano'],
+  'luxemburgo': ['luxembourg'],
+  'luxembourg': ['luxemburgo'],
+  'lyon': ['lyon'],
+  'maceio': ['maceió'],
+  'maceió': ['maceio'],
+  'macapa': ['macapá'],
+  'macapá': ['macapa'],
+  'madrid': ['madri', 'madrid'],
+  'madri': ['madrid'],
+  'male': ['malé'],
+  'malé': ['male'],
+  'manila': ['manila'],
+  'marseille': ['marselha'],
+  'marselha': ['marseille'],
+  'marrocos': ['morocco'],
+  'mexico': ['méxico'],
+  'mexico city': ['cidade do méxico', 'cidade do mexico'],
+  'méxico': ['mexico'],
+  'miami': ['miami'],
+  'milan': ['milão'],
+  'milao': ['milan'],
+  'milão': ['milan'],
+  'minneapolis': ['mineápolis'],
+  'mineápolis': ['minneapolis'],
+  'mombasa': ['mombaça'],
+  'mombaça': ['mombasa'],
+  'mombaca': ['mombasa'],
+  'montevideo': ['montevidéu'],
+  'montevidéu': ['montevideo'],
+  'morocco': ['marrocos'],
+  'moscow': ['moscou'],
+  'moscou': ['moscow'],
+  'mumbai': ['bombaim'],
+  'munich': ['munique'],
+  'munique': ['munich'],
+  'muscat': ['mascate'],
+  'mascate': ['muscat'],
+  'nairóbi': ['nairobi'],
+  'nairobi': ['nairóbi'],
+  'nanquim': ['nanjing'],
+  'nanjing': ['nanquim'],
+  'naples': ['nápoles'],
+  'napoles': ['naples'],
+  'nápoles': ['naples'],
+  'nassau': ['nassau'],
+  'netherlands': ['holanda', 'países baixos', 'paises baixos'],
+  'new delhi': ['nova delhi', 'nova délhi'],
+  'new york': ['nova iorque'],
+  'new orleans': ['nova orleans'],
+  'new zealand': ['nova zelândia', 'nova zelandia'],
+  'nice': ['nice'],
+  'norway': ['noruega'],
+  'noruega': ['norway'],
+  'nova delhi': ['new delhi'],
+  'nova délhi': ['new delhi'],
+  'nova iorque': ['new york'],
+  'nova orleans': ['new orleans'],
+  'nova zelândia': ['new zealand'],
+  'nova zelandia': ['new zealand'],
+  'noumea': ['nouméa'],
+  'nouméa': ['noumea'],
+  'nuremberg': ['nuremberga'],
+  'nuremberga': ['nuremberg'],
+  'oslo': ['oslo'],
+  'paises baixos': ['netherlands'],
+  'países baixos': ['netherlands'],
+  'pakistan': ['paquistão'],
+  'panama city': ['cidade do panamá', 'cidade do panama'],
+  'paquistao': ['pakistan'],
+  'paquistão': ['pakistan'],
+  'paris': ['paris'],
+  'pequim': ['beijing'],
+  'perth': ['perth'],
+  'philadelphia': ['filadelfia', 'filadélfia'],
+  'philippines': ['filipinas'],
+  'phnom penh': ['phnom penh'],
+  'pittsburgh': ['pitsburgo'],
+  'pitsburgo': ['pittsburgh'],
+  'poland': ['polônia'],
+  'polonia': ['poland'],
+  'polônia': ['poland'],
+  'prague': ['praga'],
+  'praga': ['prague'],
+  'punta cana': ['punta cana'],
+  'reykjavik': ['reykjavik'],
+  'riade': ['riyadh'],
+  'ribeirao preto': ['ribeirão preto'],
+  'ribeirão preto': ['ribeirao preto'],
+  'rhodes': ['rodes'],
+  'rodes': ['rhodes'],
+  'riyadh': ['riade'],
+  'rome': ['roma'],
+  'romania': ['romênia'],
+  'romenia': ['romania'],
+  'romênia': ['romania'],
+  'roma': ['rome'],
+  'rotterdam': ['roterdão'],
+  'roterdão': ['rotterdam'],
+  'russia': ['rússia'],
+  'rússia': ['russia'],
+  'saint petersburg': ['são petersburgo'],
+  'santiago': ['santiago'],
+  'santo domingo': ['santo domingo'],
+  'sao francisco': ['são francisco'],
+  'sao luis': ['são luís'],
+  'sao paulo': ['são paulo'],
+  'sao petersburgo': ['saint petersburg'],
+  'são francisco': ['san francisco'],
+  'são luís': ['sao luis'],
+  'são paulo': ['sao paulo'],
+  'são petersburgo': ['saint petersburg'],
+  'san francisco': ['são francisco'],
+  'seville': ['sevilha'],
+  'sevilha': ['seville'],
+  'seul': ['seoul'],
+  'seoul': ['seul'],
+  'shanghai': ['xangai'],
+  'singapore': ['singapura'],
+  'singapura': ['singapore'],
+  'slovakia': ['eslovaquia', 'eslováquia'],
+  'slovenia': ['eslovenia', 'eslovênia'],
+  'sofia': ['sófia'],
+  'sófia': ['sofia'],
+  'south korea': ['coreia do sul', 'coréia do sul'],
+  'spain': ['espanha'],
+  'stockholm': ['estocolmo'],
+  'estocolmo': ['stockholm'],
+  'strasbourg': ['estrasburgo'],
+  'suecia': ['sweden'],
+  'suécia': ['sweden'],
+  'suica': ['switzerland'],
+  'suíça': ['switzerland'],
+  'sweden': ['suecia', 'suécia'],
+  'switzerland': ['suica', 'suíça'],
+  'sydney': ['sydney'],
+  'tahiti': ['taiti'],
+  'taiti': ['tahiti'],
+  'tailandia': ['thailand'],
+  'tailândia': ['thailand'],
+  'taipei': ['taipé'],
+  'taipé': ['taipei'],
+  'tashkent': ['toshkent'],
+  'tbilisi': ['tiblissi'],
+  'tehran': ['teerã'],
+  'teerã': ['tehran'],
+  'territory federal de kuala lumpur': ['kuala lumpur'],
+  'território federal de kuala lumpur': ['kuala lumpur'],
+  'thailand': ['tailandia', 'tailândia'],
+  'thessaloniki': ['tessalônica'],
+  'tessalonica': ['thessaloniki'],
+  'tessalônica': ['thessaloniki'],
+  'tiblissi': ['tbilisi'],
+  'tokyo': ['tóquio'],
+  'toquio': ['tokyo'],
+  'tóquio': ['tokyo'],
+  'toshkent': ['tashkent'],
+  'toulouse': ['toulouse'],
+  'turin': ['turim'],
+  'turim': ['turin'],
+  'turkey': ['turquia'],
+  'turquia': ['turkey'],
+  'uberlandia': ['uberlândia'],
+  'uberlândia': ['uberlandia'],
+  'united arab emirates': ['emirados arabes', 'emirados árabes'],
+  'united kingdom': ['reino unido'],
+  'reino unido': ['united kingdom'],
+  'ulaanbaatar': ['ulan bator'],
+  'ulan bator': ['ulaanbaatar'],
+  'valencia': ['valência'],
+  'valência': ['valencia'],
+  'venice': ['veneza'],
+  'veneza': ['venice'],
+  'vienna': ['viena'],
+  'viena': ['vienna'],
+  'vientiane': ['vienciana'],
+  'vienciana': ['vientiane'],
+  'vitoria': ['vitória'],
+  'vitória': ['vitoria'],
+  'warsaw': ['varsóvia'],
+  'varsovia': ['warsaw'],
+  'varsóvia': ['warsaw'],
+  'washington': ['washington'],
+  'xangai': ['shanghai'],
+  'yangon': ['yangon', 'rangum'],
+  'rangum': ['yangon'],
+  'yerevan': ['ierevan'],
+  'ierevan': ['yerevan'],
+     'zurich': ['zurique'],
+     'zurique': ['zurich'],
+     'brazil': ['brasil'],
+     'brasil': ['brazil'],
+     'united states': ['estados unidos'],
+     'estados unidos': ['united states'],
+};
+
 // ── FERIADOS ──────────────────────────────────────────────────────────────
 const FERIADOS = [
   { name: '🟡 Paixão/Páscoa (Sex)',  ranges: [{sd:2,sm:4,ed:5,em:4},{sd:3,sm:4,ed:5,em:4}] },
@@ -355,8 +781,8 @@ const FERIADOS = [
   { name: '🟡 9 de Julho',           ranges: [{sd:8,sm:7,ed:12,em:11},{sd:9,sm:7,ed:12,em:11}] },
   { name: '🎄 Natal/Ano Novo',       ranges: [{sd:18,sm:12,ed:3,em:1},{sd:19,sm:12,ed:3,em:1},{sd:20,sm:12,ed:3,em:1}] },
   { name: '🎂 Niver São Paulo',      ranges: [{sd:20,sm:12,ed:3,em:1},{sd:22,sm:1,ed:25,em:1}] },
-  { name: '🎭 2027 Carnaval Full',     ranges: [{sd:5,sm:2,ed:14,em:2},{sd:6,sm:2,ed:14,em:2},{sd:7,sm:2,ed:14,em:2}] },
-  { name: '🎭 2027 Carnaval Metade',        ranges: [{sd:5,sm:2,ed:10,em:2},{sd:6,sm:2,ed:10,em:2}] },
+  { name: '🎭 2027 Carnaval Full',    voltaMin:{d:11,m:2}, ranges: [{sd:5,sm:2,ed:14,em:2},{sd:6,sm:2,ed:14,em:2},{sd:7,sm:2,ed:14,em:2}] },
+  { name: '🎭 2027 Carnaval Metade', voltaMax:{d:10,m:2}, ranges: [{sd:5,sm:2,ed:10,em:2},{sd:6,sm:2,ed:10,em:2}] },
 ];
 
 function midnightOf(d) {
@@ -377,8 +803,8 @@ function dateInFeriado(date, feriado) {
   return false;
 }
 const MONTH_MAP = {
-  jan:1,jann:1, fev:2, mar:3, abr:4, mai:5,
-  jun:6,junn:6, jul:7,jull:7, ago:8,
+  jan:1,jann:1, fev:2,fevv:2, mar:3,marr:3, abr:4,abrr:4, mai:5,maii:5,
+  jun:6,junn:6, jul:7,jull:7, ago:8,agoo:8,
   set:9,sett:9, out:10,outt:10, nov:11,novv:11, dez:12,dezz:12
 };
 
@@ -446,6 +872,8 @@ function enterMode(mode) {
   state.mode = mode;
   state.selectedMonth = 'ALL'; state.selectedDay = 'ALL'; state.currentPage = 0;
   state.feriadoFilter = 'ALL';
+  state.regiaoFilter = 'ALL';
+  state.diasFilter = 'ALL';
   document.getElementById('landing').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   document.body.className = mode === 'voos' ? 'mode-voos' : '';
@@ -459,6 +887,8 @@ function switchMode() {
   state.selectedDest = 'ALL'; state.search = '';
   state.selectedMonth = 'ALL'; state.selectedDay = 'ALL'; state.currentPage = 0;
   state.feriadoFilter = 'ALL';
+  state.regiaoFilter = 'ALL';
+  state.diasFilter = 'ALL';
   document.getElementById('searchInput').value = '';
   document.body.className = m === 'voos' ? 'mode-voos' : '';
   updateHeader(); showLoading(); loadFromGitHub();
@@ -468,7 +898,7 @@ function updateHeader() {
   const isH = state.mode === 'hoteis';
   document.getElementById('headerMode').textContent = isH ? '🏨✈️  Voos e Hotéis' : '✈️  Apenas Voos';
   document.getElementById('switchLabel').textContent = isH ? 'Apenas Voos' : 'Voos e Hotéis';
-  document.getElementById('destLabel').textContent = isH ? 'Filtrar cidade' : 'Filtrar destino';
+  // destLabel removed
 }
 
 // ── COLLAPSE ───────────────────────────────────────────────────────────────
@@ -523,6 +953,15 @@ async function loadFromGitHub() {
           const parsed = parseDateField(row['DATA_DE_IDA']);
           row['DATA_DE_IDA'] = parsed.ida;
           row['DATA_VOLTA']  = parsed.volta || row['VOLTA'] || '';
+          // Compute _dias = difference in days between ida and volta
+          if (parsed.ida && parsed.volta) {
+            const d1 = new Date(parsed.ida + 'T12:00:00');
+            const d2 = new Date(parsed.volta + 'T12:00:00');
+            const diff = Math.round((d2 - d1) / 86400000);
+            row['_dias'] = diff > 0 ? diff : '';
+          } else {
+            row['_dias'] = '';
+          }
         }
         state.allRows.push({ ...row, _file_date: date, _file_date_ts: dateTs, _is_latest: f.isLatest });
       });
@@ -544,6 +983,19 @@ async function loadFromGitHub() {
       state.allRows = state.allRows.filter(row => {
         const cityKey = (row['PARA'] || '').trim().toUpperCase();
         return latestTsPerCity[cityKey] && row._file_date_ts === latestTsPerCity[cityKey]._file_date_ts;
+      });
+
+      // Remove duplicatas exatas: mesmo destino + mesma data de ida + mesmo preço
+      const seen = new Set();
+      state.allRows = state.allRows.filter(row => {
+        const k = [
+          (row['PARA']       || '').trim().toUpperCase(),
+          (row['DATA_DE_IDA']|| '').trim(),
+          (row['PREÇO']      || '').trim(),
+        ].join('|');
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
       });
     }
 
@@ -593,7 +1045,7 @@ function splitIdaVolta(raw) {
   return [s, ''];
 }
 
-function partToISO(part) {
+function partToISO(part, refYear) {
   if (!part) return '';
   if (/^\d{4}-\d{2}-\d{2}$/.test(part)) return part; // already ISO
   const monthKeys = Object.keys(MONTH_MAP).sort((a,b) => b.length - a.length);
@@ -604,7 +1056,12 @@ function partToISO(part) {
   const day = m[1].padStart(2, '0');
   const mon = parseMonthAbbr(m[2]);
   if (!mon) return part;
-  // Determine year: if month already passed this year, use next year
+  // If refYear given (volta uses ida's year), use it directly, crossing to next if needed
+  if (refYear !== undefined) {
+    // volta month < ida month means it crosses into next year (e.g. dez→jan)
+    return `${refYear}-${mon}-${day}`;
+  }
+  // ida: if month already passed this year, use next year
   const now = new Date();
   let year = now.getFullYear();
   const testDate = new Date(year, parseInt(mon)-1, parseInt(day));
@@ -615,10 +1072,20 @@ function partToISO(part) {
 function parseDateField(raw) {
   // Returns {ida: 'YYYY-MM-DD', volta: 'YYYY-MM-DD'}
   const [idaPart, voltaPart] = splitIdaVolta(raw);
-  return {
-    ida:   partToISO(idaPart),
-    volta: voltaPart ? partToISO(voltaPart) : ''
-  };
+  const idaISO = partToISO(idaPart);
+  let voltaISO = '';
+  if (voltaPart) {
+    // Derive volta year from ida: same year unless volta month < ida month (crosses year)
+    const idaMonth = idaISO ? parseInt(idaISO.split('-')[1]) : 0;
+    const idaYear  = idaISO ? parseInt(idaISO.split('-')[0]) : new Date().getFullYear();
+    const voltaMonthKeys = Object.keys(MONTH_MAP).sort((a,b) => b.length - a.length);
+    const voltaMonthPat  = voltaMonthKeys.join('|');
+    const vmatch = voltaPart.match(new RegExp(`^\\d{1,2}(${voltaMonthPat})$`, 'i'));
+    const voltaMonNum = vmatch ? (MONTH_MAP[vmatch[1].toLowerCase()] || 0) : 0;
+    const voltaYear = voltaMonNum > 0 && voltaMonNum < idaMonth ? idaYear + 1 : idaYear;
+    voltaISO = partToISO(voltaPart, voltaYear);
+  }
+  return { ida: idaISO, volta: voltaISO };
 }
 
 // ── CSV ────────────────────────────────────────────────────────────────────
@@ -657,6 +1124,7 @@ function extractDate(name) {
 function getSortVal(row, col) {
   if (col === '_file_date')   return row._file_date_ts;
   if (col === 'Checkin_Date' || col === 'DATA_DE_IDA') return isoToTs(row[col]);
+  if (col === '_dias') return parseInt(row['_dias']) || 0;
   if (['Final Price','Price','Air Price','PREÇO','MILHAS','# Days'].includes(col)) return parsePrice(row[col]);
   return row[col] || '';
 }
@@ -667,21 +1135,35 @@ function getFiltered() {
 
   if (state.selectedDest !== 'ALL') rows = rows.filter(r => r[key] === state.selectedDest);
 
+  // Dias filter (voos only)
+  if (state.diasFilter !== 'ALL') {
+    rows = rows.filter(r => String(r._dias) === state.diasFilter);
+  }
+
   if (state.search) {
-    const q = state.search.toLowerCase();
+    const norm = s => (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const q = norm(state.search);
+    // Expand query with aliases — also match alias keys that START WITH the query
+    const aliasTerms = new Set([q]);
+    for (const [key, vals] of Object.entries(SEARCH_ALIASES)) {
+      const normKey = norm(key);
+      if (normKey === q || normKey.startsWith(q) || q.startsWith(normKey)) {
+        aliasTerms.add(normKey);
+        vals.forEach(v => aliasTerms.add(norm(v)));
+      }
+    }
+    const matches = (field) => {
+      const f = norm(field);
+      for (const term of aliasTerms) { if (f.includes(term)) return true; }
+      return false;
+    };
     if (state.mode === 'hoteis') {
       rows = rows.filter(r =>
-        (r.City||'').toLowerCase().includes(q) ||
-        (r['City Name']||'').toLowerCase().includes(q) ||
-        (r.Country||'').toLowerCase().includes(q) ||
-        (r['Hotel Name']||'').toLowerCase().includes(q)
+        matches(r.City) || matches(r['City Name']) || matches(r.Country) || matches(r['Hotel Name'])
       );
     } else {
       rows = rows.filter(r =>
-        (r.PARA||'').toLowerCase().includes(q) ||
-        (r.CIDADE||'').toLowerCase().includes(q) ||
-        (r['PAÍS']||'').toLowerCase().includes(q) ||
-        (r.DE||'').toLowerCase().includes(q)
+        matches(r.PARA) || matches(r.CIDADE) || matches(r['PAÍS']) || matches(r.DE)
       );
     }
   }
@@ -690,13 +1172,39 @@ function getFiltered() {
   if (state.feriadoFilter !== 'ALL') {
     const feriado = FERIADOS.find(f => f.name === state.feriadoFilter);
     if (feriado) {
-      const dateKey = state.mode === 'hoteis' ? 'Checkin_Date' : 'DATA_DE_IDA';
+      const idaKey   = state.mode === 'hoteis' ? 'Checkin_Date' : 'DATA_DE_IDA';
+      const voltaKey = state.mode === 'hoteis' ? 'Checkout_Date' : 'DATA_VOLTA';
       rows = rows.filter(r => {
-        const d = getRowDate(r, dateKey);
-        if (!d) return false;
-        return dateInFeriado(d, feriado);
+        const ida = getRowDate(r, idaKey);
+        if (!ida) return false;
+        if (!dateInFeriado(ida, feriado)) return false;
+        // Se o feriado tem restrição de volta, checar
+        if (feriado.voltaMax || feriado.voltaMin) {
+          const volta = getRowDate(r, voltaKey);
+          if (!volta) return false;
+          const v = midnightOf(volta);
+          // Resolve o ano da volta baseado no ano da ida
+          if (feriado.voltaMax) {
+            const max = new Date(ida.getFullYear(), feriado.voltaMax.m - 1, feriado.voltaMax.d);
+            if (v > max) return false;
+          }
+          if (feriado.voltaMin) {
+            const min = new Date(ida.getFullYear(), feriado.voltaMin.m - 1, feriado.voltaMin.d);
+            if (v < min) return false;
+          }
+        }
+        return true;
       });
     }
+  }
+
+  // Regiao filter (Brasil / Exterior)
+  if (state.regiaoFilter !== 'ALL') {
+    rows = rows.filter(r => {
+      const pais = (r['PAÍS'] || r['Country'] || '').trim().toLowerCase();
+      const isBrasil = pais === 'brazil' || pais === 'brasil';
+      return state.regiaoFilter === 'brasil' ? isBrasil : !isBrasil;
+    });
   }
 
   // Date filter
@@ -729,7 +1237,7 @@ function getDests() {
 }
 
 // ── RENDER ─────────────────────────────────────────────────────────────────
-function render() { renderFileList(); renderDateFilter(); renderDestFilter(); renderFeriadosFilter(); renderSortBar(); renderTable(); updateStatus(); }
+function render() { renderFileList(); renderDateFilter(); renderDiasFilter(); renderFeriadosFilter(); renderRegiaoFilter(); renderSortBar(); renderTable(); updateStatus(); }
 
 function showLoading() {
   document.getElementById('loadingBox').style.display = 'block';
@@ -737,7 +1245,6 @@ function showLoading() {
   document.getElementById('fileList').innerHTML = '';
   document.getElementById('emptyState').style.display = 'block';
   document.getElementById('dataSection').style.display = 'none';
-  document.getElementById('destSection').style.display = 'none';
   document.getElementById('status-bar').innerHTML = 'carregando...';
 }
 
@@ -756,30 +1263,61 @@ function renderFileList() {
     </div>`).join('');
 }
 
-function renderDestFilter() {
-  const dests = getDests();
-  const section = document.getElementById('destSection');
-  if (!dests.length) { section.style.display = 'none'; return; }
-  section.style.display = 'block';
-  const key = state.mode === 'hoteis' ? 'City' : 'PARA';
+function renderDiasFilter() {
+  const section = document.getElementById('diasFilterSection');
+  if (!section) return;
+  // Only show for voos mode and when there are rows with _dias
+  if (state.mode !== 'voos') { section.style.display = 'none'; return; }
 
-  // No mobile (≤768px), nasce colapsado
-  const isMobile = window.innerWidth <= 768;
-  const grid = document.getElementById('cityGrid');
-  const arrow = document.getElementById('destArrow');
+  // Get the currently filtered rows (minus dias filter itself) to show relevant options
+  const tempDias = state.diasFilter;
+  state.diasFilter = 'ALL';
+  const { rows: filteredRows, total } = getFiltered();
+  state.diasFilter = tempDias;
+
+  const diasSet = new Set();
+  filteredRows.forEach(r => { if (r._dias) diasSet.add(String(r._dias)); });
+  // Also include all rows to count totals
+  const allFiltered = (() => {
+    const t = state.diasFilter; state.diasFilter = 'ALL';
+    const allRows = state.allRows;
+    state.diasFilter = t;
+    return allRows;
+  })();
+
+  const dias = [...diasSet].sort((a, b) => parseInt(a) - parseInt(b));
+  if (!dias.length) { section.style.display = 'none'; return; }
+  section.style.display = 'block';
+
+  const grid = document.getElementById('diasFilterGrid');
+  const allActive = state.diasFilter === 'ALL';
+  grid.innerHTML =
+    `<button class="city-btn all-btn ${allActive ? 'active' : ''}" data-dval="ALL">TODOS</button>` +
+    dias.map(d => {
+      const count = filteredRows.filter(r => String(r._dias) === d).length;
+      const isActive = state.diasFilter === d;
+      return `<button class="city-btn ${isActive ? 'active' : ''}" data-dval="${d}">${d}d<br><span style="font-size:9px;opacity:0.6">${count}</span></button>`;
+    }).join('');
+
+  grid.querySelectorAll('button[data-dval]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.diasFilter = btn.getAttribute('data-dval');
+      state.currentPage = 0;
+      renderDiasFilter();
+      renderTable();
+      updateStatus();
+    });
+  });
+
+  // Collapse behavior — mobile starts closed, desktop open
+  const arrow = document.getElementById('diasFilterArrow');
+  const body = document.getElementById('diasFilterBody');
   if (!section._initialized) {
     section._initialized = true;
-    section._open = !isMobile; // desktop: aberto | mobile: fechado
+    section._open = window.innerWidth > 768;
+    body.style.display = section._open ? '' : 'none';
+    if (arrow) arrow.classList.toggle('open', section._open);
   }
-  grid.style.display = section._open ? '' : 'none';
-  if (arrow) arrow.classList.toggle('open', section._open);
-
-  document.getElementById('cityGrid').innerHTML =
-    `<button class="city-btn all-btn ${state.selectedDest==='ALL'?'active':''}" onclick="selectDest('ALL')">TODOS (${state.allRows.length})</button>` +
-    dests.map(d => {
-      const n = state.allRows.filter(r => r[key] === d).length;
-      return `<button class="city-btn ${state.selectedDest===d?'active':''}" onclick="selectDest('${d}')">${d}<br><span style="font-size:9px;opacity:0.6">${n}</span></button>`;
-    }).join('');
 }
 
 const SORT_H = [
@@ -791,6 +1329,7 @@ const SORT_H = [
 const SORT_V = [
   {col:'PREÇO', label:'Preço'},
   {col:'DATA_DE_IDA', label:'Data Ida'},
+  {col:'_dias', label:'Dias'},
   {col:'MILHAS', label:'Milhas'},
   {col:'PARA', label:'Destino A→Z'},
   {col:'_file_date', label:'Data Busca'},
@@ -805,7 +1344,7 @@ function renderSortBar() {
 
 // Sem coluna VOLTA; Preços renomeado para "PREÇOS (3 PESSOAS)"; Data Busca no final
 const HEAD_H = ['CIDADE','CHECK-IN','DIAS','HOTEL','FONTE','PREÇOS (3 PESSOAS)','LINKS','DATA BUSCA'];
-const HEAD_V = ['DE','PARA','CIDADE','IDA/VOLTA','DATA IDA','DATA VOLTA','HORÁRIO','ESCALA','PREÇO','MILHAS','LINK','DATA BUSCA'];
+const HEAD_V = ['DE','PARA','CIDADE','IDA/VOLTA','DATA IDA','DATA VOLTA','DIAS','HORÁRIO','ESCALA','PREÇO','MILHAS','LINK','DATA BUSCA'];
 
 function renderTable() {
   const empty = document.getElementById('emptyState');
@@ -883,6 +1422,7 @@ function rowV(r) {
     <td>${(()=>{ const v=r.DATA_VOLTA||''; const ok=v&&v!=='-'&&v.toLowerCase()!=='unknown'; return ok?'<span style="font-size:11px;padding:2px 8px;border-radius:4px;background:#e8f0ff;color:#0052cc;font-weight:500">Ida e Volta</span>':'<span style="font-size:11px;padding:2px 8px;border-radius:4px;background:#f7f8fa;color:#5a6072">Apenas Ida</span>'; })()}</td>
     <td style="font-family:var(--mono);font-size:12px">${fmtDate(r.DATA_DE_IDA)}</td>
     <td style="font-family:var(--mono);font-size:12px;color:var(--text-muted)">${(()=>{ const v=r.DATA_VOLTA||''; return(!v||v==='-'||v.toLowerCase()==='unknown')?'-':fmtDate(v); })()}</td>
+    <td style="font-family:var(--mono);font-size:12px;color:var(--text-muted)">${r._dias ? r._dias + 'd' : '-'}</td>
     <td style="font-family:var(--mono);font-size:12px">${r.HORÁRIO||'-'}</td>
     <td><span class="badge-escala ${isDireto?'direto':'escala'}">${r.ESCALA||'-'}</span></td>
     <td><div class="price-final">R$ ${fmtN(preco)}</div></td>
@@ -901,7 +1441,6 @@ function updateStatus() {
 }
 
 // ── ACTIONS ────────────────────────────────────────────────────────────────
-function selectDest(d) { state.selectedDest = d; state.currentPage = 0; render(); }
 function setSort(col) {
   if (state.sortCol === col) state.sortAsc = !state.sortAsc;
   else { state.sortCol = col; state.sortAsc = true; }
@@ -909,13 +1448,13 @@ function setSort(col) {
 }
 document.getElementById('searchInput').addEventListener('input', e => { state.search = e.target.value; state.currentPage = 0; renderTable(); });
 
-function toggleDest() {
-  const section = document.getElementById('destSection');
-  const grid = document.getElementById('cityGrid');
-  const arrow = document.getElementById('destArrow');
+function toggleDiasFilter() {
+  const section = document.getElementById('diasFilterSection');
+  const body = document.getElementById('diasFilterBody');
+  const arrow = document.getElementById('diasFilterArrow');
   section._open = !section._open;
-  grid.style.display = section._open ? '' : 'none';
-  arrow.classList.toggle('open', section._open);
+  body.style.display = section._open ? '' : 'none';
+  if (arrow) arrow.classList.toggle('open', section._open);
 }
 
 
@@ -1095,14 +1634,45 @@ function initFeriadosOpen() {
   if (arrow) arrow.classList.toggle('open', feriadosOpen);
 }
 
-window.selectDest = selectDest;
+function renderRegiaoFilter() {
+  const grid = document.getElementById('regiaoGrid');
+  if (!grid) return;
+  const opts = [
+    { val: 'ALL',      label: '🌐 Todos' },
+    { val: 'exterior', label: '✈️ Fora do Brasil' },
+    { val: 'brasil',   label: '🇧🇷 Brasil' },
+  ];
+  grid.innerHTML = opts.map(o => {
+    const isActive = state.regiaoFilter === o.val;
+    return `<button data-rval="${o.val}" style="
+      text-align:left;padding:7px 10px;border-radius:6px;font-size:12px;cursor:pointer;
+      border:1.5px solid ${isActive ? 'var(--mode-accent)' : 'var(--border)'};
+      background:${isActive ? 'var(--mode-light)' : '#fff'};
+      color:${isActive ? 'var(--mode-accent)' : 'var(--text-muted)'};
+      font-weight:${isActive ? '600' : '400'};
+    ">${o.label}</button>`;
+  }).join('');
+  grid.querySelectorAll('button[data-rval]').forEach(btn => {
+    btn.addEventListener('click', () => setRegiao(btn.getAttribute('data-rval')));
+  });
+}
+
+function setRegiao(val) {
+  state.regiaoFilter = val;
+  state.currentPage = 0;
+  renderRegiaoFilter();
+  renderTable();
+  updateStatus();
+}
+
 window.setSort = setSort;
 window.switchMode = switchMode;
 window.enterMode = enterMode;
-window.toggleDest = toggleDest;
+window.toggleDiasFilter = toggleDiasFilter;
 window.toggleDate = toggleDate;
 window.toggleFeriados = toggleFeriados;
 window.setFeriado = setFeriado;
+window.setRegiao = setRegiao;
 window.selectMonth = selectMonth;
 window.selectDay = selectDay;
 window.goPage = goPage;
