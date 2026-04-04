@@ -1374,6 +1374,17 @@ function getDests() {
 // ── RENDER ─────────────────────────────────────────────────────────────────
 function render() { renderFileList(); renderDateFilter(); renderDiasFilter(); renderFeriadosFilter(); renderRegiaoFilter(); renderIdaVoltaFilter(); renderSortBar(); renderTable(); updateStatus(); }
 
+// Chamado após qualquer mudança de filtro — atualiza TUDO
+function renderAllFilters() {
+  renderDateFilter();
+  renderDiasFilter();
+  renderFeriadosFilter();
+  renderRegiaoFilter();
+  renderIdaVoltaFilter();
+  renderTable();
+  updateStatus();
+}
+
 function showLoading() {
   document.getElementById('loadingBox').style.display = 'block';
   document.getElementById('loadingBox').innerHTML = '<span class="spinner"></span>buscando CSVs...';
@@ -1428,9 +1439,7 @@ function renderDiasFilter() {
     btn.addEventListener('click', () => {
       state.diasFilter = btn.getAttribute('data-dval');
       state.currentPage = 0;
-      renderDiasFilter();
-      renderTable();
-      updateStatus();
+      renderAllFilters();
     });
   });
 
@@ -1614,7 +1623,7 @@ function setSort(col) {
   else { state.sortCol = col; state.sortAsc = true; }
   renderSortBar(); renderTable();
 }
-document.getElementById('searchInput').addEventListener('input', e => { state.search = e.target.value; state.currentPage = 0; renderTable(); });
+document.getElementById('searchInput').addEventListener('input', e => { state.search = e.target.value; state.currentPage = 0; renderAllFilters(); });
 
 function toggleDiasFilter() {
   const section = document.getElementById('diasFilterSection');
@@ -1726,16 +1735,13 @@ function selectMonth(mon) {
   state.selectedMonth = mon;
   state.selectedDay = 'ALL';
   state.currentPage = 0;
-  renderDateFilter();
-  renderTable();
-  updateStatus();
+  renderAllFilters();
 }
 
 function selectDay(day) {
   state.selectedDay = day;
   state.currentPage = 0;
-  renderTable();
-  updateStatus();
+  renderAllFilters();
 }
 
 function toggleDate() {
@@ -1820,9 +1826,7 @@ function renderFeriadosFilter() {
         else state.feriadoFilter.push(name);
       }
       state.currentPage = 0;
-      renderFeriadosFilter();
-      renderTable();
-      updateStatus();
+      renderAllFilters();
     });
   });
 }
@@ -1917,9 +1921,7 @@ function renderIdaVoltaFilter() {
     btn.addEventListener('click', () => {
       state.idaVoltaFilter = btn.getAttribute('data-ivval');
       state.currentPage = 0;
-      renderIdaVoltaFilter();
-      renderTable();
-      updateStatus();
+      renderAllFilters();
     });
   });
 }
@@ -2006,9 +2008,7 @@ function renderRegiaoFilter() {
         else state.regiaoFilter.push(val);
       }
       state.currentPage = 0;
-      renderRegiaoFilter();
-      renderTable();
-      updateStatus();
+      renderAllFilters();
     });
   });
 }
