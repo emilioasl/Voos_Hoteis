@@ -63,6 +63,9 @@ header { border-bottom: 1px solid var(--border); padding: 14px 28px; display: fl
 .header-mode { font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; padding: 4px 12px; border-radius: 6px; font-weight: 700; background: var(--mode-light); color: var(--mode-accent); border: 1px solid var(--mode-accent); white-space: nowrap; }
 .switch-btn { margin-left: auto; padding: 7px 16px; border-radius: 8px; border: 1.5px solid var(--border2); background: #fff; color: var(--text-muted); font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
 .switch-btn:hover { border-color: var(--mode-accent); color: var(--mode-accent); }
+.sticky-toggle-btn { margin-left: auto; padding: 7px 14px; border-radius: 8px; border: 1.5px solid var(--border2); background: #fff; color: var(--text-muted); font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+.sticky-toggle-btn:hover { border-color: var(--mode-accent); color: var(--mode-accent); }
+.sticky-toggle-btn.active { background: var(--mode-accent); border-color: var(--mode-accent); color: #fff; }
 #status-bar { font-family: var(--mono); font-size: 11px; color: var(--text-dim); }
 #status-bar b { color: var(--mode-accent); }
 #status-bar-mobile { display: none; font-family: var(--mono); font-size: 11px; color: var(--text-dim); padding: 10px 14px; border-bottom: 1px solid var(--border); background: var(--surface); }
@@ -127,12 +130,15 @@ main { padding: 22px 26px; overflow-x: hidden; }
 .result-count b { color: var(--text); }
 
 /* TABLE */
-.table-wrap { overflow-x: auto; overflow-y: auto; max-height: calc(100vh - 200px); border: 1px solid var(--border); border-radius: var(--radius); background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
+.table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
-thead { background: var(--surface); position: sticky; top: 0; z-index: 10; }
+thead { background: var(--surface); }
 thead th { padding: 10px 13px; text-align: left; font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; color: var(--text-muted); border-bottom: 2px solid var(--border2); white-space: nowrap; text-transform: uppercase; cursor: pointer; user-select: none; }
 thead th:hover { color: var(--mode-accent); }
 thead th.sorted { color: var(--mode-accent); }
+/* Sticky header ON */
+body.sticky-header .table-wrap { overflow-y: auto; max-height: calc(100vh - 200px); }
+body.sticky-header thead { position: sticky; top: 0; z-index: 10; }
 tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
 tbody tr:last-child { border-bottom: none; }
 tbody tr:hover { background: var(--mode-light); }
@@ -204,6 +210,9 @@ td { padding: 9px 13px; vertical-align: middle; }
   <header>
     <div class="header-mode" id="headerMode">—</div>
     <div id="status-bar" style="display:none"></div>
+    <button class="sticky-toggle-btn" id="stickyToggleBtn" onclick="toggleStickyHeader()" title="Fixar cabeçalho da tabela">
+      📌 Header Off
+    </button>
     <button class="switch-btn" id="switchBtn" onclick="switchMode()">⇄ <span id="switchLabel">—</span></button>
   </header>
 
@@ -2025,6 +2034,21 @@ window.selectMonth = selectMonth;
 window.selectDay = selectDay;
 window.goPage = goPage;
 window.toggleArquivos = toggleArquivos;
+
+function toggleStickyHeader() {
+  const isOn = document.body.classList.toggle('sticky-header');
+  const btn = document.getElementById('stickyToggleBtn');
+  if (btn) {
+    btn.textContent = isOn ? '📌 Header On' : '📌 Header Off';
+    btn.classList.toggle('active', isOn);
+  }
+  // Reset scroll position when toggling off
+  if (!isOn) {
+    const wrap = document.querySelector('.table-wrap');
+    if (wrap) wrap.scrollTop = 0;
+  }
+}
+window.toggleStickyHeader = toggleStickyHeader;
 </script>
 </body>
 </html>
