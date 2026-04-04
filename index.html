@@ -1294,6 +1294,78 @@ function getFiltered() {
   return { rows: sorted.slice(start, start + PAGE_SIZE), total: sorted.length };
 }
 
+// Retorna TODOS os rows filtrados sem paginar — usado pelos filtros laterais
+function getAllFiltered(overrides = {}) {
+  const savedDias      = state.diasFilter;
+  const savedIdaVolta  = state.idaVoltaFilter;
+  const savedRegiao    = state.regiaoFilter;
+  const savedFeriado   = state.feriadoFilter;
+  const savedMonth     = state.selectedMonth;
+  const savedDay       = state.selectedDay;
+  const savedPage      = state.currentPage;
+
+  Object.assign(state, overrides);
+  state.currentPage = 0;
+
+  // Temporarily bump PAGE_SIZE to get all rows
+  const origPS = PAGE_SIZE;
+  // We can't reassign const, so use getFiltered with a trick:
+  // Instead, just duplicate the filter logic inline with no slice
+  let rows = state.allRows;
+  const key = state.mode === 'hoteis' ? 'City' : 'PARA';
+  if (state.selectedDest !== 'ALL') rows = rows.filter(r => r[key] === state.selectedDest);
+  if (state.diasFilter !== 'ALL') rows = rows.filter(r => String(r._dias) === state.diasFilter);
+  if (state.search) {
+    const norm = s => (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const q = norm(state.search);
+    const aliasTerms = new Set([q]);
+    for (const [ak, vals] of Object.entries(SEARCH_ALIASES)) {
+      const nk = norm(ak);
+      if (nk === q || nk.startsWith(q) || q.startsWith(nk)) { aliasTerms.add(nk); vals.forEach(v => aliasTerms.add(norm(v))); }
+    }
+    const matches = f => { const fn = norm(f); for (const t of aliasTerms) { if (fn.includes(t)) return true; } return false; };
+    if (state.mode === 'hoteis') rows = rows.filter(r => matches(r.City) || matches(r['City Name']) || matches(r.Country) || matches(r['Hotel Name']));
+    else rows = rows.filter(r => matches(r.PARA) || matches(r.CIDADE) || matches(r['PAÍS']) || matches(r.DE));
+  }
+  if (state.feriadoFilter.length > 0) {
+    const selF = FERIADOS.filter(f => state.feriadoFilter.includes(f.name));
+    const idaK = state.mode === 'hoteis' ? 'Checkin_Date' : 'DATA_DE_IDA';
+    const volK = state.mode === 'hoteis' ? 'Checkout_Date' : 'DATA_VOLTA';
+    rows = rows.filter(r => {
+      const ida = getRowDate(r, idaK); if (!ida) return false;
+      return selF.some(feriado => {
+        if (!dateInFeriado(ida, feriado)) return false;
+        if (feriado.voltaMax || feriado.voltaMin) {
+          const volta = getRowDate(r, volK); if (!volta) return false;
+          const v = midnightOf(volta);
+          if (feriado.voltaMax && v > new Date(ida.getFullYear(), feriado.voltaMax.m-1, feriado.voltaMax.d)) return false;
+          if (feriado.voltaMin && v < new Date(ida.getFullYear(), feriado.voltaMin.m-1, feriado.voltaMin.d)) return false;
+        }
+        return true;
+      });
+    });
+  }
+  if (state.regiaoFilter.length > 0) rows = rows.filter(r => state.regiaoFilter.includes(getRowRegiao(r)));
+  if (state.mode === 'voos' && state.idaVoltaFilter !== 'ALL') {
+    rows = rows.filter(r => { const v=(r.DATA_VOLTA||'').trim(); const tv=v&&v!=='-'&&v.toLowerCase()!=='unknown'; return state.idaVoltaFilter==='idavolta'?tv:!tv; });
+  }
+  if (state.selectedMonth !== 'ALL') {
+    const dk = state.mode === 'hoteis' ? 'Checkin_Date' : 'DATA_DE_IDA';
+    rows = rows.filter(r => { const d=getRowDate(r,dk); if(!d)return false; if(MESES[d.getMonth()]!==state.selectedMonth)return false; if(state.selectedDay!=='ALL'&&String(d.getDate()).padStart(2,'0')!==state.selectedDay)return false; return true; });
+  }
+
+  // restore
+  state.diasFilter     = savedDias;
+  state.idaVoltaFilter = savedIdaVolta;
+  state.regiaoFilter   = savedRegiao;
+  state.feriadoFilter  = savedFeriado;
+  state.selectedMonth  = savedMonth;
+  state.selectedDay    = savedDay;
+  state.currentPage    = savedPage;
+
+  return rows;
+}
+
 function getDests() {
   const key = state.mode === 'hoteis' ? 'City' : 'PARA';
   return [...new Set(state.allRows.map(r => r[key]).filter(Boolean))].sort();
@@ -1332,21 +1404,11 @@ function renderDiasFilter() {
   // Only show for voos mode and when there are rows with _dias
   if (state.mode !== 'voos') { section.style.display = 'none'; return; }
 
-  // Get the currently filtered rows (minus dias filter itself) to show relevant options
-  const tempDias = state.diasFilter;
-  state.diasFilter = 'ALL';
-  const { rows: filteredRows, total } = getFiltered();
-  state.diasFilter = tempDias;
+  // Get ALL currently filtered rows (ignoring dias filter) — not just current page
+  const filteredRows = getAllFiltered({ diasFilter: 'ALL' });
 
   const diasSet = new Set();
   filteredRows.forEach(r => { if (r._dias) diasSet.add(String(r._dias)); });
-  // Also include all rows to count totals
-  const allFiltered = (() => {
-    const t = state.diasFilter; state.diasFilter = 'ALL';
-    const allRows = state.allRows;
-    state.diasFilter = t;
-    return allRows;
-  })();
 
   const dias = [...diasSet].sort((a, b) => parseInt(a) - parseInt(b));
   if (!dias.length) { section.style.display = 'none'; return; }
@@ -1590,8 +1652,10 @@ function getRowDate(row, key) {
 
 function getAvailableMonths() {
   const dateKey = state.mode === 'hoteis' ? 'Checkin_Date' : 'DATA_DE_IDA';
+  // Use all filtered rows (ignoring month/day filter) so months react to other filters
+  const rows = getAllFiltered({ selectedMonth: 'ALL', selectedDay: 'ALL' });
   const months = new Set();
-  for (const row of state.allRows) {
+  for (const row of rows) {
     const d = getRowDate(row, dateKey);
     if (d) months.add(MESES[d.getMonth()] + '/' + d.getFullYear());
   }
@@ -1605,8 +1669,10 @@ function getAvailableMonths() {
 
 function getAvailableDays(month) {
   const dateKey = state.mode === 'hoteis' ? 'Checkin_Date' : 'DATA_DE_IDA';
+  // Use filtered rows (ignoring day filter) so days react to other filters + selected month
+  const rows = getAllFiltered({ selectedDay: 'ALL' });
   const days = new Set();
-  for (const row of state.allRows) {
+  for (const row of rows) {
     const d = getRowDate(row, dateKey);
     if (!d) continue;
     const mon = MESES[d.getMonth()] + '/' + d.getFullYear();
@@ -1693,7 +1759,26 @@ function renderFeriadosFilter() {
   initFeriadosOpen();
   const grid = document.getElementById('feriadosGrid');
   if (!grid) return;
-  // "Todas as datas" button
+
+  // Base rows ignoring feriado filter — to count hits per feriado
+  const baseRows = getAllFiltered({ feriadoFilter: [] });
+  const idaKey   = state.mode === 'hoteis' ? 'Checkin_Date' : 'DATA_DE_IDA';
+  const voltaKey = state.mode === 'hoteis' ? 'Checkout_Date' : 'DATA_VOLTA';
+
+  function countFeriado(feriado) {
+    return baseRows.filter(r => {
+      const ida = getRowDate(r, idaKey); if (!ida) return false;
+      if (!dateInFeriado(ida, feriado)) return false;
+      if (feriado.voltaMax || feriado.voltaMin) {
+        const volta = getRowDate(r, voltaKey); if (!volta) return false;
+        const v = midnightOf(volta);
+        if (feriado.voltaMax && v > new Date(ida.getFullYear(), feriado.voltaMax.m-1, feriado.voltaMax.d)) return false;
+        if (feriado.voltaMin && v < new Date(ida.getFullYear(), feriado.voltaMin.m-1, feriado.voltaMin.d)) return false;
+      }
+      return true;
+    }).length;
+  }
+
   const allActive = state.feriadoFilter.length === 0;
   const allBtn = `<button data-fidx="-1" style="
     text-align:left;padding:7px 10px;border-radius:6px;font-size:12px;cursor:pointer;
@@ -1702,10 +1787,12 @@ function renderFeriadosFilter() {
     color:${allActive ? 'var(--mode-accent)' : 'var(--text-muted)'};
     font-weight:${allActive ? '600' : '400'};
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-  ">📅 Todas as datas</button>`;
+  ">📅 Todas as datas <span style="font-size:10px;opacity:0.6">${baseRows.length}</span></button>`;
 
   const ferBtns = FERIADOS.map((o, i) => {
     const isActive = state.feriadoFilter.includes(o.name);
+    const count = countFeriado(o);
+    if (count === 0 && !isActive) return ''; // hide feriados with 0 results
     return `<button data-fidx="${i}" style="
       text-align:left;padding:7px 10px;border-radius:6px;font-size:12px;cursor:pointer;
       border:1.5px solid ${isActive ? 'var(--mode-accent)' : 'var(--border)'};
@@ -1713,7 +1800,8 @@ function renderFeriadosFilter() {
       color:${isActive ? 'var(--mode-accent)' : 'var(--text-muted)'};
       font-weight:${isActive ? '600' : '400'};
       white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-    ">${o.name}</button>`;
+      display:flex;justify-content:space-between;align-items:center;gap:6px;
+    ">${o.name}<span style="font-size:10px;opacity:0.5;flex-shrink:0">${count}</span></button>`;
   }).join('');
 
   grid.innerHTML = allBtn + ferBtns;
@@ -1794,17 +1882,23 @@ function initIdaVoltaOpen() {
 function renderIdaVoltaFilter() {
   const section = document.getElementById('idaVoltaSection');
   if (!section) return;
-  // Only show for voos mode
   if (state.mode !== 'voos') { section.style.display = 'none'; return; }
   section.style.display = 'block';
   initIdaVoltaOpen();
 
   const grid = document.getElementById('idaVoltaGrid');
   if (!grid) return;
+
+  // Base rows ignoring idaVolta filter
+  const baseRows = getAllFiltered({ idaVoltaFilter: 'ALL' });
+  const hasVolta = r => { const v=(r.DATA_VOLTA||'').trim(); return v&&v!=='-'&&v.toLowerCase()!=='unknown'; };
+  const countIda     = baseRows.filter(r => !hasVolta(r)).length;
+  const countIdaVolta = baseRows.filter(r => hasVolta(r)).length;
+
   const opts = [
-    { val: 'ALL',      label: '↔️ Todos' },
-    { val: 'ida',      label: '➡️ Apenas Ida' },
-    { val: 'idavolta', label: '↩️ Ida e Volta' },
+    { val: 'ALL',      label: '↔️ Todos',      count: baseRows.length },
+    { val: 'ida',      label: '➡️ Apenas Ida',  count: countIda },
+    { val: 'idavolta', label: '↩️ Ida e Volta', count: countIdaVolta },
   ];
   grid.innerHTML = opts.map(o => {
     const isActive = state.idaVoltaFilter === o.val;
@@ -1814,7 +1908,8 @@ function renderIdaVoltaFilter() {
       background:${isActive ? 'var(--mode-light)' : '#fff'};
       color:${isActive ? 'var(--mode-accent)' : 'var(--text-muted)'};
       font-weight:${isActive ? '600' : '400'};
-    ">${o.label}</button>`;
+      display:flex;justify-content:space-between;align-items:center;gap:6px;
+    ">${o.label}<span style="font-size:10px;opacity:0.5;flex-shrink:0">${o.count}</span></button>`;
   }).join('');
   grid.querySelectorAll('button[data-ivval]').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -1867,6 +1962,11 @@ function renderRegiaoFilter() {
     { val: 'oriente_medio',   label: '🕌 Oriente Médio' },
   ];
 
+  // Base rows ignoring regiao filter — to count per region
+  const baseRows = getAllFiltered({ regiaoFilter: [] });
+  const countByRegiao = {};
+  baseRows.forEach(r => { const reg = getRowRegiao(r); if (reg) countByRegiao[reg] = (countByRegiao[reg]||0) + 1; });
+
   const allActive = state.regiaoFilter.length === 0;
   const allBtn = `<button data-rval="ALL" style="
     text-align:left;padding:7px 10px;border-radius:6px;font-size:12px;cursor:pointer;
@@ -1874,17 +1974,21 @@ function renderRegiaoFilter() {
     background:${allActive ? 'var(--mode-light)' : '#fff'};
     color:${allActive ? 'var(--mode-accent)' : 'var(--text-muted)'};
     font-weight:${allActive ? '600' : '400'};
-  ">🌐 Todos</button>`;
+    display:flex;justify-content:space-between;align-items:center;gap:6px;
+  ">🌐 Todos<span style="font-size:10px;opacity:0.5">${baseRows.length}</span></button>`;
 
   const regBtns = opts.map(o => {
     const isActive = state.regiaoFilter.includes(o.val);
+    const count = countByRegiao[o.val] || 0;
+    if (count === 0 && !isActive) return ''; // hide regions with no results
     return `<button data-rval="${o.val}" style="
       text-align:left;padding:7px 10px;border-radius:6px;font-size:12px;cursor:pointer;
       border:1.5px solid ${isActive ? 'var(--mode-accent)' : 'var(--border)'};
       background:${isActive ? 'var(--mode-light)' : '#fff'};
       color:${isActive ? 'var(--mode-accent)' : 'var(--text-muted)'};
       font-weight:${isActive ? '600' : '400'};
-    ">${o.label}</button>`;
+      display:flex;justify-content:space-between;align-items:center;gap:6px;
+    ">${o.label}<span style="font-size:10px;opacity:0.5;flex-shrink:0">${count}</span></button>`;
   }).join('');
 
   grid.innerHTML = allBtn + regBtns;
