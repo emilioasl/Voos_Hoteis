@@ -152,7 +152,7 @@ td { padding: 9px 13px; vertical-align: middle; }
 .badge-escala.direto { background: #e3f5ee; color: #00875a; }
 .badge-escala.escala { background: #fff3e0; color: #e85d04; }
 
-.link-btn { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 3px 9px; border-radius: 4px; text-decoration: none; border: 1px solid var(--border); color: var(--text-muted); background: var(--surface2); transition: all 0.15s; white-space: nowrap; }
+.link-btn { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 3px 9px; border-radius: 4px; text-decoration: none; border: 1px solid var(--border); color: var(--text-muted); background: var(--surface2); transition: all 0.15s; white-space: nowrap; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 .link-btn:hover { border-color: var(--mode-accent); color: var(--mode-accent); background: var(--mode-light); }
 .links-cell { display: flex; gap: 5px; flex-wrap: wrap; }
 
@@ -1549,8 +1549,8 @@ function rowH(r) {
       <div class="price-sub">✈️ R$ ${fmtN(ap)}</div>
     </td>
     <td><div class="links-cell">
-      ${r.URL?`<a href="${r.URL}" target="_blank" class="link-btn">🏨 Hotel</a>`:''}
-      ${r.url_flight?`<a href="${r.url_flight}" target="_blank" class="link-btn">✈️ Voo</a>`:''}
+      ${r.URL?`<a href="${r.URL}" target="_blank" rel="noopener noreferrer" class="link-btn">🏨 Hotel</a>`:''}
+      ${r.url_flight?`<a href="${r.url_flight}" target="_blank" rel="noopener noreferrer" class="link-btn">✈️ Voo</a>`:''}
     </div></td>
     <td><span class="badge-file ${r._is_latest?'is-latest':''}">${r._file_date}</span></td>
   </tr>`;
@@ -1600,7 +1600,7 @@ function rowV(r) {
     <td><span class="badge-escala ${isDireto?'direto':'escala'}">${r.ESCALA||'-'}</span></td>
     <td><div class="price-final">R$ ${fmtN(preco)}</div></td>
     <td style="font-family:var(--mono);font-size:12px;color:var(--text-muted)">${milhas ? fmtN(milhas) : '-'}</td>
-    <td>${r.URL?`<a href="${r.URL}" target="_blank" class="link-btn">✈️ Ver voo</a>`:'-'}</td>
+    <td>${r.URL?`<a href="${r.URL}" target="_blank" rel="noopener noreferrer" class="link-btn">✈️ Ver voo</a>`:'-'}</td>
     <td><span class="badge-file ${r._is_latest?'is-latest':''}">${r._file_date}</span></td>
   </tr>`;
 }
