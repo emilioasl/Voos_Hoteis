@@ -1198,13 +1198,9 @@ function getFiltered() {
     }
   }
 
-  // Regiao filter (Brasil / Exterior)
+  // Regiao filter
   if (state.regiaoFilter !== 'ALL') {
-    rows = rows.filter(r => {
-      const pais = (r['PAÍS'] || r['Country'] || '').trim().toLowerCase();
-      const isBrasil = pais === 'brazil' || pais === 'brasil';
-      return state.regiaoFilter === 'brasil' ? isBrasil : !isBrasil;
-    });
+    rows = rows.filter(r => getRowRegiao(r) === state.regiaoFilter);
   }
 
   // Date filter
@@ -1634,13 +1630,45 @@ function initFeriadosOpen() {
   if (arrow) arrow.classList.toggle('open', feriadosOpen);
 }
 
+// ── REGIÃO MAP ────────────────────────────────────────────────────────────
+const REGIAO_MAP = {
+  'brasil':           ['brazil','brasil'],
+  'america_sul':      ['argentina','bolivia','chile','colombia','ecuador','french guiana','guyana','paraguay','peru','suriname','uruguay','venezuela'],
+  'america_central':  ['belize','costa rica','el salvador','guatemala','honduras','mexico','nicaragua','panama'],
+  'caribe':           ['antigua and barbuda','bahamas','barbados','cayman islands','cuba','dominica','dominican republic','haiti','jamaica','puerto rico','saint kitts and nevis','saint lucia','saint vincent and the grenadines','trinidad and tobago','netherlands antilles'],
+  'america_norte':    ['canada','united states','united states (hawai)','greenland'],
+  'europa':           ['albania','andorra','austria','belgium','bosnia and herzegovina','bulgaria','croatia','cyprus','czech republic','denmark','estonia','finland','france','germany','greece','hungary','iceland','ireland','isle of man','italy','kosovo','latvia','liechtenstein','lithuania','luxembourg','malta','moldova','monaco','montenegro','netherlands','north macedonia','norway','poland','portugal','romania','russia','serbia','slovakia','slovenia','spain','sweden','switzerland','ukraine','united kingdom'],
+  'asia':             ['afghanistan','armenia','azerbaijan','bahrain','bangladesh','brunei','cambodia','china','georgia','hong kong','india','indonesia','iran','iraq','israel','japan','jordan','kazakhstan','kuwait','kyrgyzstan','laos','lebanon','macau','malaysia','maldives','mongolia','myanmar','nepal','north korea','oman','pakistan','palau','philippines','qatar','saudi arabia','singapore','south korea','sri lanka','syria','taiwan','tajikistan','thailand','timor-leste','turkey','turkmenistan','uzbekistan','vietnam','yemen'],
+  'oceania':          ['australia','cook islands','fiji','kiribati','marshall islands','micronesia','new caledonia (france)','new zealand','papua new guinea','samoa','solomon islands','tonga','tuvalu','vanuatu'],
+  'africa':           ['algeria','angola','benin','botswana','burkina faso','burundi','cabo ocidental','cameroon','cape verde','central african republic','chad','comoros','democratic republic of the congo','djibouti','egypt','eritrea','eswatini','ethiopia','gabon','gambia','ghana','guinea','guinea-bissau','guine equatorial','kenya','lesotho','liberia','libya','madagascar','malawi','mali','mauritania','mauritius','morocco','mozambique','namibia','niger','nigeria','republic of the congo','rwanda','são tomé and príncipe','senegal','seychelles','sierra leone','somalia','south africa','south sudan','sudan','tanzania','togo','tunisia','uganda','zambia','zimbabwe'],
+  'oriente_medio':    ['bahrain','iran','iraq','israel','jordan','kuwait','lebanon','oman','qatar','saudi arabia','syria','united arab emirates','yemen'],
+};
+
+// Pega a região de uma row pelo campo Country/PAÍS
+function getRowRegiao(r) {
+  const raw = (r['PAÍS'] || r['Country'] || '').trim().toLowerCase();
+  if (!raw) return null;
+  for (const [reg, countries] of Object.entries(REGIAO_MAP)) {
+    if (countries.includes(raw)) return reg;
+  }
+  return null;
+}
+
 function renderRegiaoFilter() {
   const grid = document.getElementById('regiaoGrid');
   if (!grid) return;
   const opts = [
-    { val: 'ALL',      label: '🌐 Todos' },
-    { val: 'exterior', label: '✈️ Fora do Brasil' },
-    { val: 'brasil',   label: '🇧🇷 Brasil' },
+    { val: 'ALL',           label: '🌐 Todos' },
+    { val: 'brasil',        label: '🇧🇷 Brasil' },
+    { val: 'america_sul',   label: '🌎 América do Sul' },
+    { val: 'america_central', label: '🌎 América Central' },
+    { val: 'caribe',        label: '🏝️ Caribe' },
+    { val: 'america_norte', label: '🌎 América do Norte' },
+    { val: 'europa',        label: '🇪🇺 Europa' },
+    { val: 'asia',          label: '🌏 Ásia' },
+    { val: 'oceania',       label: '🌊 Oceania' },
+    { val: 'africa',        label: '🌍 África' },
+    { val: 'oriente_medio', label: '🕌 Oriente Médio' },
   ];
   grid.innerHTML = opts.map(o => {
     const isActive = state.regiaoFilter === o.val;
