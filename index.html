@@ -260,19 +260,6 @@ td { padding: 9px 13px; vertical-align: middle; }
         </div>
       </div>
 
-      <!-- 3. ARQUIVOS — colapsável, por baixo -->
-      <div class="sidebar-section" id="filesSection">
-        <div class="collapse-header" onclick="toggleArquivos()">
-          <div class="sidebar-label">Arquivos carregados</div>
-          <span class="collapse-arrow" id="collapseArrow">▼</span>
-        </div>
-        <div class="collapse-body" id="collapseBody">
-          <div id="loadingBox" class="loading-box" style="margin-top:8px">
-            <span class="spinner"></span>buscando CSVs...
-          </div>
-          <div class="file-list" id="fileList"></div>
-        </div>
-      </div>
     </aside>
 
     <main>
@@ -291,6 +278,22 @@ td { padding: 9px 13px; vertical-align: middle; }
             <thead id="tableHead"></thead>
             <tbody id="tableBody"></tbody>
           </table>
+        </div>
+        <!-- paginationBar injected here by JS -->
+        <!-- statsBar — arquivos/registros/destinos -->
+        <div id="statsBar" style="display:none;margin-top:14px;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);font-family:var(--mono);font-size:11px;color:var(--text-muted);flex-wrap:wrap;gap:8px;align-items:center"></div>
+        <!-- Arquivos carregados -->
+        <div id="filesSection" style="margin-top:14px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);overflow:hidden">
+          <div class="collapse-header" onclick="toggleArquivos()" style="padding:10px 14px">
+            <div class="sidebar-label" style="margin-bottom:0">Arquivos carregados</div>
+            <span class="collapse-arrow" id="collapseArrow">▼</span>
+          </div>
+          <div class="collapse-body" id="collapseBody" style="padding:0 14px">
+            <div id="loadingBox" class="loading-box" style="margin:8px 0">
+              <span class="spinner"></span>buscando CSVs...
+            </div>
+            <div class="file-list" id="fileList" style="padding-bottom:10px"></div>
+          </div>
         </div>
       </div>
     </main>
@@ -311,9 +314,9 @@ const state = {
   mode: 'hoteis', files: [], allRows: [],
   selectedDest: 'ALL', sortCol: '', sortAsc: true, search: '',
   selectedMonth: 'ALL', selectedDay: 'ALL', currentPage: 0,
-  feriadoFilter: 'ALL',
-  regiaoFilter: 'ALL',
-  diasFilter: 'ALL', // 'ALL' | number of days as string
+  feriadoFilter: [],   // [] = todos; array de names selecionados
+  regiaoFilter: [],    // [] = todos; array de vals selecionados
+  diasFilter: 'ALL',   // 'ALL' | number of days as string
 };
 
 // ── UTILS ──────────────────────────────────────────────────────────────────
@@ -860,7 +863,7 @@ function parseGoogleDate(raw) {
   };
 }
 
-const PAGE_SIZE = 200;
+const PAGE_SIZE = 50;
 
 // Número → string formatada: 3000 → "3.000"
 function fmtN(val) {
@@ -871,8 +874,8 @@ function fmtN(val) {
 function enterMode(mode) {
   state.mode = mode;
   state.selectedMonth = 'ALL'; state.selectedDay = 'ALL'; state.currentPage = 0;
-  state.feriadoFilter = 'ALL';
-  state.regiaoFilter = 'ALL';
+  state.feriadoFilter = [];
+  state.regiaoFilter = [];
   state.diasFilter = 'ALL';
   document.getElementById('landing').style.display = 'none';
   document.getElementById('app').style.display = 'block';
@@ -886,8 +889,8 @@ function switchMode() {
   state.mode = m; state.files = []; state.allRows = [];
   state.selectedDest = 'ALL'; state.search = '';
   state.selectedMonth = 'ALL'; state.selectedDay = 'ALL'; state.currentPage = 0;
-  state.feriadoFilter = 'ALL';
-  state.regiaoFilter = 'ALL';
+  state.feriadoFilter = [];
+  state.regiaoFilter = [];
   state.diasFilter = 'ALL';
   document.getElementById('searchInput').value = '';
   document.body.className = m === 'voos' ? 'mode-voos' : '';
@@ -951,14 +954,21 @@ async function loadFromGitHub() {
         // Parse DATA_DE_IDA into separate ida/volta for voos mode
         if (state.mode === 'voos' && row['DATA_DE_IDA']) {
           const parsed = parseDateField(row['DATA_DE_IDA']);
-          row['DATA_DE_IDA'] = parsed.ida;
-          row['DATA_VOLTA']  = parsed.volta || row['VOLTA'] || '';
+          // Save raw ISO strings for _dias calculation BEFORE any formatting
+          const idaISO   = parsed.ida   || '';
+          const voltaISO = parsed.volta || row['VOLTA'] || '';
+          row['DATA_DE_IDA'] = idaISO;
+          row['DATA_VOLTA']  = voltaISO;
           // Compute _dias = difference in days between ida and volta
-          if (parsed.ida && parsed.volta) {
-            const d1 = new Date(parsed.ida + 'T12:00:00');
-            const d2 = new Date(parsed.volta + 'T12:00:00');
-            const diff = Math.round((d2 - d1) / 86400000);
-            row['_dias'] = diff > 0 ? diff : '';
+          if (idaISO && voltaISO && idaISO !== '-' && voltaISO !== '-') {
+            const d1 = new Date(idaISO.substring(0,10) + 'T12:00:00');
+            const d2 = new Date(voltaISO.substring(0,10) + 'T12:00:00');
+            if (!isNaN(d1) && !isNaN(d2)) {
+              const diff = Math.round((d2 - d1) / 86400000);
+              row['_dias'] = diff > 0 ? diff : '';
+            } else {
+              row['_dias'] = '';
+            }
           } else {
             row['_dias'] = '';
           }
@@ -1168,22 +1178,20 @@ function getFiltered() {
     }
   }
 
-  // Feriado filter
-  if (state.feriadoFilter !== 'ALL') {
-    const feriado = FERIADOS.find(f => f.name === state.feriadoFilter);
-    if (feriado) {
-      const idaKey   = state.mode === 'hoteis' ? 'Checkin_Date' : 'DATA_DE_IDA';
-      const voltaKey = state.mode === 'hoteis' ? 'Checkout_Date' : 'DATA_VOLTA';
-      rows = rows.filter(r => {
-        const ida = getRowDate(r, idaKey);
-        if (!ida) return false;
+  // Feriado filter (multi-select — OR entre feriados selecionados)
+  if (state.feriadoFilter.length > 0) {
+    const selectedFeriados = FERIADOS.filter(f => state.feriadoFilter.includes(f.name));
+    const idaKey   = state.mode === 'hoteis' ? 'Checkin_Date' : 'DATA_DE_IDA';
+    const voltaKey = state.mode === 'hoteis' ? 'Checkout_Date' : 'DATA_VOLTA';
+    rows = rows.filter(r => {
+      const ida = getRowDate(r, idaKey);
+      if (!ida) return false;
+      return selectedFeriados.some(feriado => {
         if (!dateInFeriado(ida, feriado)) return false;
-        // Se o feriado tem restrição de volta, checar
         if (feriado.voltaMax || feriado.voltaMin) {
           const volta = getRowDate(r, voltaKey);
           if (!volta) return false;
           const v = midnightOf(volta);
-          // Resolve o ano da volta baseado no ano da ida
           if (feriado.voltaMax) {
             const max = new Date(ida.getFullYear(), feriado.voltaMax.m - 1, feriado.voltaMax.d);
             if (v > max) return false;
@@ -1195,12 +1203,12 @@ function getFiltered() {
         }
         return true;
       });
-    }
+    });
   }
 
-  // Regiao filter
-  if (state.regiaoFilter !== 'ALL') {
-    rows = rows.filter(r => getRowRegiao(r) === state.regiaoFilter);
+  // Regiao filter (multi-select — OR entre regiões selecionadas)
+  if (state.regiaoFilter.length > 0) {
+    rows = rows.filter(r => state.regiaoFilter.includes(getRowRegiao(r)));
   }
 
   // Date filter
@@ -1373,6 +1381,8 @@ function renderTable() {
   const nextDisabled = (state.currentPage + 1) * PAGE_SIZE >= total;
   const totalPages = Math.ceil(total / PAGE_SIZE);
   const curPage = state.currentPage + 1;
+  const tableWrap = document.querySelector('.table-wrap');
+
   if (totalPages > 1) {
     const bar = document.createElement('div');
     bar.id = 'paginationBar';
@@ -1382,7 +1392,16 @@ function renderTable() {
       <span style="font-family:var(--mono);font-size:11px;color:var(--text-muted)">pág ${curPage} de ${totalPages}</span>
       <button onclick="goPage(${state.currentPage+1})" ${nextDisabled?'disabled':''} style="padding:6px 14px;border:1px solid var(--border);border-radius:6px;background:${nextDisabled?'#fff':'var(--mode-accent)'};cursor:${nextDisabled?'not-allowed':'pointer'};color:${nextDisabled?'var(--text-dim)':'#fff'};font-size:12px;font-weight:500">Próximos ${PAGE_SIZE} →</button>
     `;
-    document.querySelector('.table-wrap').insertAdjacentElement('afterend', bar);
+    tableWrap.insertAdjacentElement('afterend', bar);
+  }
+
+  // Reorder: statsBar and filesSection always come after paginationBar
+  const statsBar = document.getElementById('statsBar');
+  const filesSection = document.getElementById('filesSection');
+  const dataSection = document.getElementById('dataSection');
+  if (statsBar && filesSection && dataSection) {
+    dataSection.appendChild(statsBar);
+    dataSection.appendChild(filesSection);
   }
 }
 
@@ -1411,6 +1430,29 @@ function rowV(r) {
   const preco = parsePrice(r['PREÇO']);
   const milhas = parsePrice(r['MILHAS']);
   const isDireto = (r.ESCALA||'').toLowerCase() === 'direto';
+
+  // Compute dias at render time — fallback if _dias missing
+  let diasDisplay = '-';
+  if (r._dias) {
+    diasDisplay = r._dias + 'd';
+  } else {
+    const ida  = r.DATA_DE_IDA  || '';
+    const volta = r.DATA_VOLTA  || '';
+    if (ida && volta && ida !== '-' && volta !== '-') {
+      // Try ISO substring (YYYY-MM-DD)
+      const idaISO   = /^\d{4}-\d{2}-\d{2}/.test(ida)   ? ida.substring(0,10)   : null;
+      const voltaISO = /^\d{4}-\d{2}-\d{2}/.test(volta) ? volta.substring(0,10) : null;
+      if (idaISO && voltaISO) {
+        const d1 = new Date(idaISO + 'T12:00:00');
+        const d2 = new Date(voltaISO + 'T12:00:00');
+        if (!isNaN(d1) && !isNaN(d2)) {
+          const diff = Math.round((d2 - d1) / 86400000);
+          if (diff > 0) diasDisplay = diff + 'd';
+        }
+      }
+    }
+  }
+
   return `<tr>
     <td style="font-family:var(--mono);font-size:12px;font-weight:700">${r.DE||'-'}</td>
     <td><span class="badge-dest voo">${r.PARA||'?'}</span></td>
@@ -1418,7 +1460,7 @@ function rowV(r) {
     <td>${(()=>{ const v=r.DATA_VOLTA||''; const ok=v&&v!=='-'&&v.toLowerCase()!=='unknown'; return ok?'<span style="font-size:11px;padding:2px 8px;border-radius:4px;background:#e8f0ff;color:#0052cc;font-weight:500">Ida e Volta</span>':'<span style="font-size:11px;padding:2px 8px;border-radius:4px;background:#f7f8fa;color:#5a6072">Apenas Ida</span>'; })()}</td>
     <td style="font-family:var(--mono);font-size:12px">${fmtDate(r.DATA_DE_IDA)}</td>
     <td style="font-family:var(--mono);font-size:12px;color:var(--text-muted)">${(()=>{ const v=r.DATA_VOLTA||''; return(!v||v==='-'||v.toLowerCase()==='unknown')?'-':fmtDate(v); })()}</td>
-    <td style="font-family:var(--mono);font-size:12px;color:var(--text-muted)">${r._dias ? r._dias + 'd' : '-'}</td>
+    <td style="font-family:var(--mono);font-size:12px;color:var(--text-muted)">${diasDisplay}</td>
     <td style="font-family:var(--mono);font-size:12px">${r.HORÁRIO||'-'}</td>
     <td><span class="badge-escala ${isDireto?'direto':'escala'}">${r.ESCALA||'-'}</span></td>
     <td><div class="price-final">R$ ${fmtN(preco)}</div></td>
@@ -1432,8 +1474,14 @@ function updateStatus() {
   const label = state.mode === 'hoteis' ? 'cidades' : 'destinos';
   const modeNote = state.mode === 'voos' ? ' · <span style="color:var(--accent-v)">último arquivo</span>' : '';
   const statusHTML = `<b>${state.files.length}</b> arquivo(s)${modeNote} · <b>${state.allRows.length}</b> registros · <b>${getDests().length}</b> ${label}`;
+  // Header: apenas indicador de modo (já tem no headerMode), keep light
   document.getElementById('status-bar').innerHTML = statusHTML;
   document.getElementById('status-bar-mobile').innerHTML = statusHTML;
+  const sb = document.getElementById('statsBar');
+  if (sb) {
+    sb.style.display = state.files.length ? 'flex' : 'none';
+    sb.innerHTML = statusHTML;
+  }
 }
 
 // ── ACTIONS ────────────────────────────────────────────────────────────────
@@ -1583,9 +1631,19 @@ function renderFeriadosFilter() {
   initFeriadosOpen();
   const grid = document.getElementById('feriadosGrid');
   if (!grid) return;
-  const opts = [{ name: 'ALL', label: '📅 Todas as datas' }, ...FERIADOS];
-  grid.innerHTML = opts.map((o, i) => {
-    const isActive = state.feriadoFilter === o.name;
+  // "Todas as datas" button
+  const allActive = state.feriadoFilter.length === 0;
+  const allBtn = `<button data-fidx="-1" style="
+    text-align:left;padding:7px 10px;border-radius:6px;font-size:12px;cursor:pointer;
+    border:1.5px solid ${allActive ? 'var(--mode-accent)' : 'var(--border)'};
+    background:${allActive ? 'var(--mode-light)' : '#fff'};
+    color:${allActive ? 'var(--mode-accent)' : 'var(--text-muted)'};
+    font-weight:${allActive ? '600' : '400'};
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  ">📅 Todas as datas</button>`;
+
+  const ferBtns = FERIADOS.map((o, i) => {
+    const isActive = state.feriadoFilter.includes(o.name);
     return `<button data-fidx="${i}" style="
       text-align:left;padding:7px 10px;border-radius:6px;font-size:12px;cursor:pointer;
       border:1.5px solid ${isActive ? 'var(--mode-accent)' : 'var(--border)'};
@@ -1593,23 +1651,28 @@ function renderFeriadosFilter() {
       color:${isActive ? 'var(--mode-accent)' : 'var(--text-muted)'};
       font-weight:${isActive ? '600' : '400'};
       white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-    ">${o.label || o.name}</button>`;
+    ">${o.name}</button>`;
   }).join('');
+
+  grid.innerHTML = allBtn + ferBtns;
+
   grid.querySelectorAll('button[data-fidx]').forEach(btn => {
     btn.addEventListener('click', () => {
       const idx = parseInt(btn.getAttribute('data-fidx'));
-      const name = idx === 0 ? 'ALL' : FERIADOS[idx - 1].name;
-      setFeriado(name);
+      if (idx === -1) {
+        state.feriadoFilter = [];
+      } else {
+        const name = FERIADOS[idx].name;
+        const pos = state.feriadoFilter.indexOf(name);
+        if (pos >= 0) state.feriadoFilter.splice(pos, 1);
+        else state.feriadoFilter.push(name);
+      }
+      state.currentPage = 0;
+      renderFeriadosFilter();
+      renderTable();
+      updateStatus();
     });
   });
-}
-
-function setFeriado(name) {
-  state.feriadoFilter = name;
-  state.currentPage = 0;
-  renderFeriadosFilter();
-  renderTable();
-  updateStatus();
 }
 
 let feriadosOpen = null; // null = not yet initialized
@@ -1635,16 +1698,15 @@ const REGIAO_MAP = {
   'brasil':           ['brazil','brasil'],
   'america_sul':      ['argentina','bolivia','chile','colombia','ecuador','french guiana','guyana','paraguay','peru','suriname','uruguay','venezuela'],
   'america_central':  ['belize','costa rica','el salvador','guatemala','honduras','mexico','nicaragua','panama'],
-  'caribe':           ['antigua and barbuda','bahamas','barbados','cayman islands','cuba','dominica','dominican republic','haiti','jamaica','puerto rico','saint kitts and nevis','saint lucia','saint vincent and the grenadines','trinidad and tobago','netherlands antilles'],
+  'caribe':           ['antigua and barbuda','bahamas','barbados','cayman islands','cuba','dominica','dominican republic','haiti','jamaica','puerto rico','saint kitts and nevis','saint lucia','saint vincent and the grenadines','trinidad and tobago'],
   'america_norte':    ['canada','united states','united states (hawai)','greenland'],
   'europa':           ['albania','andorra','austria','belgium','bosnia and herzegovina','bulgaria','croatia','cyprus','czech republic','denmark','estonia','finland','france','germany','greece','hungary','iceland','ireland','isle of man','italy','kosovo','latvia','liechtenstein','lithuania','luxembourg','malta','moldova','monaco','montenegro','netherlands','north macedonia','norway','poland','portugal','romania','russia','serbia','slovakia','slovenia','spain','sweden','switzerland','ukraine','united kingdom'],
-  'asia':             ['afghanistan','armenia','azerbaijan','bahrain','bangladesh','brunei','cambodia','china','georgia','hong kong','india','indonesia','iran','iraq','israel','japan','jordan','kazakhstan','kuwait','kyrgyzstan','laos','lebanon','macau','malaysia','maldives','mongolia','myanmar','nepal','north korea','oman','pakistan','palau','philippines','qatar','saudi arabia','singapore','south korea','sri lanka','syria','taiwan','tajikistan','thailand','timor-leste','turkey','turkmenistan','uzbekistan','vietnam','yemen'],
+  'asia':             ['afghanistan','armenia','azerbaijan','bangladesh','brunei','cambodia','china','georgia','hong kong','india','indonesia','japan','kazakhstan','kyrgyzstan','laos','macau','malaysia','maldives','mongolia','myanmar','nepal','north korea','pakistan','palau','philippines','singapore','south korea','sri lanka','taiwan','tajikistan','thailand','timor-leste','turkey','turkmenistan','uzbekistan','vietnam'],
   'oceania':          ['australia','cook islands','fiji','kiribati','marshall islands','micronesia','new caledonia (france)','new zealand','papua new guinea','samoa','solomon islands','tonga','tuvalu','vanuatu'],
   'africa':           ['algeria','angola','benin','botswana','burkina faso','burundi','cabo ocidental','cameroon','cape verde','central african republic','chad','comoros','democratic republic of the congo','djibouti','egypt','eritrea','eswatini','ethiopia','gabon','gambia','ghana','guinea','guinea-bissau','guine equatorial','kenya','lesotho','liberia','libya','madagascar','malawi','mali','mauritania','mauritius','morocco','mozambique','namibia','niger','nigeria','republic of the congo','rwanda','são tomé and príncipe','senegal','seychelles','sierra leone','somalia','south africa','south sudan','sudan','tanzania','togo','tunisia','uganda','zambia','zimbabwe'],
   'oriente_medio':    ['bahrain','iran','iraq','israel','jordan','kuwait','lebanon','oman','qatar','saudi arabia','syria','united arab emirates','yemen'],
 };
 
-// Pega a região de uma row pelo campo Country/PAÍS
 function getRowRegiao(r) {
   const raw = (r['PAÍS'] || r['Country'] || '').trim().toLowerCase();
   if (!raw) return null;
@@ -1658,20 +1720,29 @@ function renderRegiaoFilter() {
   const grid = document.getElementById('regiaoGrid');
   if (!grid) return;
   const opts = [
-    { val: 'ALL',           label: '🌐 Todos' },
-    { val: 'brasil',        label: '🇧🇷 Brasil' },
-    { val: 'america_sul',   label: '🌎 América do Sul' },
+    { val: 'brasil',          label: '🇧🇷 Brasil' },
+    { val: 'america_sul',     label: '🌎 América do Sul' },
     { val: 'america_central', label: '🌎 América Central' },
-    { val: 'caribe',        label: '🏝️ Caribe' },
-    { val: 'america_norte', label: '🌎 América do Norte' },
-    { val: 'europa',        label: '🇪🇺 Europa' },
-    { val: 'asia',          label: '🌏 Ásia' },
-    { val: 'oceania',       label: '🌊 Oceania' },
-    { val: 'africa',        label: '🌍 África' },
-    { val: 'oriente_medio', label: '🕌 Oriente Médio' },
+    { val: 'caribe',          label: '🏝️ Caribe' },
+    { val: 'america_norte',   label: '🌎 América do Norte' },
+    { val: 'europa',          label: '🇪🇺 Europa' },
+    { val: 'asia',            label: '🌏 Ásia' },
+    { val: 'oceania',         label: '🌊 Oceania' },
+    { val: 'africa',          label: '🌍 África' },
+    { val: 'oriente_medio',   label: '🕌 Oriente Médio' },
   ];
-  grid.innerHTML = opts.map(o => {
-    const isActive = state.regiaoFilter === o.val;
+
+  const allActive = state.regiaoFilter.length === 0;
+  const allBtn = `<button data-rval="ALL" style="
+    text-align:left;padding:7px 10px;border-radius:6px;font-size:12px;cursor:pointer;
+    border:1.5px solid ${allActive ? 'var(--mode-accent)' : 'var(--border)'};
+    background:${allActive ? 'var(--mode-light)' : '#fff'};
+    color:${allActive ? 'var(--mode-accent)' : 'var(--text-muted)'};
+    font-weight:${allActive ? '600' : '400'};
+  ">🌐 Todos</button>`;
+
+  const regBtns = opts.map(o => {
+    const isActive = state.regiaoFilter.includes(o.val);
     return `<button data-rval="${o.val}" style="
       text-align:left;padding:7px 10px;border-radius:6px;font-size:12px;cursor:pointer;
       border:1.5px solid ${isActive ? 'var(--mode-accent)' : 'var(--border)'};
@@ -1680,17 +1751,25 @@ function renderRegiaoFilter() {
       font-weight:${isActive ? '600' : '400'};
     ">${o.label}</button>`;
   }).join('');
-  grid.querySelectorAll('button[data-rval]').forEach(btn => {
-    btn.addEventListener('click', () => setRegiao(btn.getAttribute('data-rval')));
-  });
-}
 
-function setRegiao(val) {
-  state.regiaoFilter = val;
-  state.currentPage = 0;
-  renderRegiaoFilter();
-  renderTable();
-  updateStatus();
+  grid.innerHTML = allBtn + regBtns;
+
+  grid.querySelectorAll('button[data-rval]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const val = btn.getAttribute('data-rval');
+      if (val === 'ALL') {
+        state.regiaoFilter = [];
+      } else {
+        const pos = state.regiaoFilter.indexOf(val);
+        if (pos >= 0) state.regiaoFilter.splice(pos, 1);
+        else state.regiaoFilter.push(val);
+      }
+      state.currentPage = 0;
+      renderRegiaoFilter();
+      renderTable();
+      updateStatus();
+    });
+  });
 }
 
 window.setSort = setSort;
@@ -1699,8 +1778,6 @@ window.enterMode = enterMode;
 window.toggleDiasFilter = toggleDiasFilter;
 window.toggleDate = toggleDate;
 window.toggleFeriados = toggleFeriados;
-window.setFeriado = setFeriado;
-window.setRegiao = setRegiao;
 window.selectMonth = selectMonth;
 window.selectDay = selectDay;
 window.goPage = goPage;
