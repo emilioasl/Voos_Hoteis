@@ -73,12 +73,12 @@ header { border-bottom: 1px solid var(--border); padding: 14px 28px; display: fl
 
 /* SIDEBAR */
 aside { border-right: 1px solid var(--border); background: var(--surface); padding: 20px 0; position: sticky; top: 53px; height: calc(100vh - 53px); overflow-y: auto; }
-.sidebar-section { padding: 0 14px 18px; border-bottom: 1px solid var(--border); margin-bottom: 18px; }
+.sidebar-section { padding: 0 14px 10px; border-bottom: 1px solid var(--border); margin-bottom: 0; }
 .sidebar-section:last-child { border-bottom: none; }
 .sidebar-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; color: var(--text-dim); margin-bottom: 10px; text-transform: uppercase; }
 
 /* COLLAPSIBLE */
-.collapse-header { display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; }
+.collapse-header { display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; padding: 10px 0; }
 .collapse-header .sidebar-label { margin-bottom: 0; }
 .collapse-arrow { font-size: 10px; color: var(--text-dim); transition: transform 0.2s; display: inline-block; }
 .collapse-arrow.open { transform: rotate(180deg); }
@@ -129,7 +129,7 @@ main { padding: 22px 26px; overflow-x: hidden; }
 /* TABLE */
 .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
-thead { background: var(--surface); }
+thead { background: var(--surface); position: sticky; top: 53px; z-index: 10; }
 thead th { padding: 10px 13px; text-align: left; font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; color: var(--text-muted); border-bottom: 2px solid var(--border2); white-space: nowrap; text-transform: uppercase; cursor: pointer; user-select: none; }
 thead th:hover { color: var(--mode-accent); }
 thead th.sorted { color: var(--mode-accent); }
@@ -172,6 +172,7 @@ td { padding: 9px 13px; vertical-align: middle; }
   #filesSection { border-bottom: 1px solid var(--border); }
   #status-bar { display: none; }
   #status-bar-mobile { display: block; }
+  thead { top: 53px; }
 }
 </style>
 </head>
@@ -236,6 +237,17 @@ td { padding: 9px 13px; vertical-align: middle; }
         </div>
         <div id="regiaoBody" style="display:flex;flex-direction:column;gap:5px;margin-top:10px">
           <div id="regiaoGrid" style="display:flex;flex-direction:column;gap:5px"></div>
+        </div>
+      </div>
+
+      <!-- FILTRO IDA/VOLTA -->
+      <div class="sidebar-section" id="idaVoltaSection">
+        <div class="collapse-header" onclick="toggleIdaVolta()">
+          <div class="sidebar-label">↔️ Tipo de voo</div>
+          <span class="collapse-arrow" id="idaVoltaArrow">▼</span>
+        </div>
+        <div id="idaVoltaBody" style="display:none;flex-direction:column;gap:5px;margin-top:4px">
+          <div id="idaVoltaGrid" style="display:flex;flex-direction:column;gap:5px"></div>
         </div>
       </div>
 
@@ -322,6 +334,7 @@ const state = {
   feriadoFilter: [],   // [] = todos; array de names selecionados
   regiaoFilter: [],    // [] = todos; array de vals selecionados
   diasFilter: 'ALL',   // 'ALL' | number of days as string
+  idaVoltaFilter: 'ALL', // 'ALL' | 'ida' | 'idavolta'
 };
 
 // ── UTILS ──────────────────────────────────────────────────────────────────
@@ -882,6 +895,7 @@ function enterMode(mode) {
   state.feriadoFilter = [];
   state.regiaoFilter = [];
   state.diasFilter = 'ALL';
+  state.idaVoltaFilter = 'ALL';
   document.getElementById('landing').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   document.body.className = mode === 'voos' ? 'mode-voos' : '';
@@ -897,6 +911,7 @@ function switchMode() {
   state.feriadoFilter = [];
   state.regiaoFilter = [];
   state.diasFilter = 'ALL';
+  state.idaVoltaFilter = 'ALL';
   document.getElementById('searchInput').value = '';
   document.body.className = m === 'voos' ? 'mode-voos' : '';
   updateHeader(); showLoading(); loadFromGitHub();
@@ -1012,6 +1027,32 @@ async function loadFromGitHub() {
         seen.add(k);
         return true;
       });
+    }
+
+    }
+
+    // Normalize _dias for ALL voos rows — ensures sort works correctly
+    if (state.mode === 'voos') {
+      const toISO = s => {
+        if (!s || s === '-') return null;
+        if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.substring(0,10);
+        const m = s.match(/^(\d{2})-(\d{2})-(\d{2,4})$/);
+        if (m) { let y=parseInt(m[3]); if(y<100)y+=2000; return `${y}-${m[2]}-${m[1]}`; }
+        return null;
+      };
+      for (const row of state.allRows) {
+        if (row['_dias']) continue; // already computed
+        const idaISO   = toISO(row['DATA_DE_IDA']  || '');
+        const voltaISO = toISO(row['DATA_VOLTA']    || '');
+        if (idaISO && voltaISO) {
+          const d1 = new Date(idaISO + 'T12:00:00');
+          const d2 = new Date(voltaISO + 'T12:00:00');
+          if (!isNaN(d1) && !isNaN(d2)) {
+            const diff = Math.round((d2 - d1) / 86400000);
+            row['_dias'] = diff > 0 ? diff : '';
+          }
+        }
+      }
     }
 
     state.sortCol = state.mode === 'hoteis' ? 'Final Price' : 'PREÇO';
@@ -1222,6 +1263,15 @@ function getFiltered() {
     rows = rows.filter(r => state.regiaoFilter.includes(getRowRegiao(r)));
   }
 
+  // Ida/Volta filter (voos only)
+  if (state.mode === 'voos' && state.idaVoltaFilter !== 'ALL') {
+    rows = rows.filter(r => {
+      const v = (r.DATA_VOLTA || '').trim();
+      const temVolta = v && v !== '-' && v.toLowerCase() !== 'unknown';
+      return state.idaVoltaFilter === 'idavolta' ? temVolta : !temVolta;
+    });
+  }
+
   // Date filter
   if (state.selectedMonth !== 'ALL') {
     const dateKey = state.mode === 'hoteis' ? 'Checkin_Date' : 'DATA_DE_IDA';
@@ -1252,7 +1302,7 @@ function getDests() {
 }
 
 // ── RENDER ─────────────────────────────────────────────────────────────────
-function render() { renderFileList(); renderDateFilter(); renderDiasFilter(); renderFeriadosFilter(); renderRegiaoFilter(); renderSortBar(); renderTable(); updateStatus(); }
+function render() { renderFileList(); renderDateFilter(); renderDiasFilter(); renderFeriadosFilter(); renderRegiaoFilter(); renderIdaVoltaFilter(); renderSortBar(); renderTable(); updateStatus(); }
 
 function showLoading() {
   document.getElementById('loadingBox').style.display = 'block';
@@ -1725,6 +1775,60 @@ function initRegiaoOpen() {
   if (arrow) arrow.classList.toggle('open', regiaoOpen);
 }
 
+let idaVoltaOpen = null;
+function toggleIdaVolta() {
+  idaVoltaOpen = !idaVoltaOpen;
+  const body = document.getElementById('idaVoltaBody');
+  const arrow = document.getElementById('idaVoltaArrow');
+  if (body) body.style.display = idaVoltaOpen ? 'flex' : 'none';
+  if (arrow) arrow.classList.toggle('open', idaVoltaOpen);
+}
+
+function initIdaVoltaOpen() {
+  if (idaVoltaOpen !== null) return;
+  idaVoltaOpen = window.innerWidth > 768;
+  const body = document.getElementById('idaVoltaBody');
+  const arrow = document.getElementById('idaVoltaArrow');
+  if (body) body.style.display = idaVoltaOpen ? 'flex' : 'none';
+  if (arrow) arrow.classList.toggle('open', idaVoltaOpen);
+}
+
+function renderIdaVoltaFilter() {
+  const section = document.getElementById('idaVoltaSection');
+  if (!section) return;
+  // Only show for voos mode
+  if (state.mode !== 'voos') { section.style.display = 'none'; return; }
+  section.style.display = 'block';
+  initIdaVoltaOpen();
+
+  const grid = document.getElementById('idaVoltaGrid');
+  if (!grid) return;
+  const opts = [
+    { val: 'ALL',      label: '↔️ Todos' },
+    { val: 'ida',      label: '➡️ Apenas Ida' },
+    { val: 'idavolta', label: '↩️ Ida e Volta' },
+  ];
+  grid.innerHTML = opts.map(o => {
+    const isActive = state.idaVoltaFilter === o.val;
+    return `<button data-ivval="${o.val}" style="
+      text-align:left;padding:7px 10px;border-radius:6px;font-size:12px;cursor:pointer;
+      border:1.5px solid ${isActive ? 'var(--mode-accent)' : 'var(--border)'};
+      background:${isActive ? 'var(--mode-light)' : '#fff'};
+      color:${isActive ? 'var(--mode-accent)' : 'var(--text-muted)'};
+      font-weight:${isActive ? '600' : '400'};
+    ">${o.label}</button>`;
+  }).join('');
+  grid.querySelectorAll('button[data-ivval]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.idaVoltaFilter = btn.getAttribute('data-ivval');
+      state.currentPage = 0;
+      renderIdaVoltaFilter();
+      renderTable();
+      updateStatus();
+    });
+  });
+}
+
 // ── REGIÃO MAP ────────────────────────────────────────────────────────────
 const REGIAO_MAP = {
   'brasil':           ['brazil','brasil'],
@@ -1812,6 +1916,7 @@ window.toggleDiasFilter = toggleDiasFilter;
 window.toggleDate = toggleDate;
 window.toggleFeriados = toggleFeriados;
 window.toggleRegiao = toggleRegiao;
+window.toggleIdaVolta = toggleIdaVolta;
 window.selectMonth = selectMonth;
 window.selectDay = selectDay;
 window.goPage = goPage;
