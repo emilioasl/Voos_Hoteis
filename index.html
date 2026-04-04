@@ -202,7 +202,7 @@ td { padding: 9px 13px; vertical-align: middle; }
 <div id="app">
   <header>
     <div class="header-mode" id="headerMode">—</div>
-    <div id="status-bar">carregando...</div>
+    <div id="status-bar" style="display:none"></div>
     <button class="switch-btn" id="switchBtn" onclick="switchMode()">⇄ <span id="switchLabel">—</span></button>
   </header>
 
@@ -230,8 +230,13 @@ td { padding: 9px 13px; vertical-align: middle; }
 
       <!-- REGIAO: Brasil / Exterior -->
       <div class="sidebar-section" id="regiaoSection">
-        <div class="sidebar-label">🌍 Região</div>
-        <div style="display:flex;flex-direction:column;gap:5px;margin-top:10px" id="regiaoGrid"></div>
+        <div class="collapse-header" onclick="toggleRegiao()">
+          <div class="sidebar-label">🌍 Região</div>
+          <span class="collapse-arrow" id="regiaoArrow">▼</span>
+        </div>
+        <div id="regiaoBody" style="display:flex;flex-direction:column;gap:5px;margin-top:10px">
+          <div id="regiaoGrid" style="display:flex;flex-direction:column;gap:5px"></div>
+        </div>
       </div>
 
       <!-- 3. FILTRAR DATA -->
@@ -1057,7 +1062,16 @@ function splitIdaVolta(raw) {
 
 function partToISO(part, refYear) {
   if (!part) return '';
-  if (/^\d{4}-\d{2}-\d{2}$/.test(part)) return part; // already ISO
+  // Already full ISO YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(part)) return part;
+  // DD-MM-YY or DD-MM-YYYY (scraper format)
+  const ddmmyy = part.match(/^(\d{2})-(\d{2})-(\d{2,4})$/);
+  if (ddmmyy) {
+    const day = ddmmyy[1], mon = ddmmyy[2];
+    let yr = parseInt(ddmmyy[3]);
+    if (yr < 100) yr += 2000; // 27 → 2027
+    return `${yr}-${mon}-${day}`;
+  }
   const monthKeys = Object.keys(MONTH_MAP).sort((a,b) => b.length - a.length);
   const monthPattern = monthKeys.join('|');
   const re = new RegExp(`^(\\d{1,2})(${monthPattern})$`, 'i');
@@ -1066,12 +1080,9 @@ function partToISO(part, refYear) {
   const day = m[1].padStart(2, '0');
   const mon = parseMonthAbbr(m[2]);
   if (!mon) return part;
-  // If refYear given (volta uses ida's year), use it directly, crossing to next if needed
   if (refYear !== undefined) {
-    // volta month < ida month means it crosses into next year (e.g. dez→jan)
     return `${refYear}-${mon}-${day}`;
   }
-  // ida: if month already passed this year, use next year
   const now = new Date();
   let year = now.getFullYear();
   const testDate = new Date(year, parseInt(mon)-1, parseInt(day));
@@ -1439,9 +1450,14 @@ function rowV(r) {
     const ida  = r.DATA_DE_IDA  || '';
     const volta = r.DATA_VOLTA  || '';
     if (ida && volta && ida !== '-' && volta !== '-') {
-      // Try ISO substring (YYYY-MM-DD)
-      const idaISO   = /^\d{4}-\d{2}-\d{2}/.test(ida)   ? ida.substring(0,10)   : null;
-      const voltaISO = /^\d{4}-\d{2}-\d{2}/.test(volta) ? volta.substring(0,10) : null;
+      const toISO = s => {
+        if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.substring(0,10);
+        const m = s.match(/^(\d{2})-(\d{2})-(\d{2,4})$/);
+        if (m) { let y=parseInt(m[3]); if(y<100)y+=2000; return `${y}-${m[2]}-${m[1]}`; }
+        return null;
+      };
+      const idaISO   = toISO(ida);
+      const voltaISO = toISO(volta);
       if (idaISO && voltaISO) {
         const d1 = new Date(idaISO + 'T12:00:00');
         const d2 = new Date(voltaISO + 'T12:00:00');
@@ -1474,9 +1490,7 @@ function updateStatus() {
   const label = state.mode === 'hoteis' ? 'cidades' : 'destinos';
   const modeNote = state.mode === 'voos' ? ' · <span style="color:var(--accent-v)">último arquivo</span>' : '';
   const statusHTML = `<b>${state.files.length}</b> arquivo(s)${modeNote} · <b>${state.allRows.length}</b> registros · <b>${getDests().length}</b> ${label}`;
-  // Header: apenas indicador de modo (já tem no headerMode), keep light
-  document.getElementById('status-bar').innerHTML = statusHTML;
-  document.getElementById('status-bar-mobile').innerHTML = statusHTML;
+  // StatsBar abaixo da paginação — única aparição
   const sb = document.getElementById('statsBar');
   if (sb) {
     sb.style.display = state.files.length ? 'flex' : 'none';
@@ -1693,6 +1707,24 @@ function initFeriadosOpen() {
   if (arrow) arrow.classList.toggle('open', feriadosOpen);
 }
 
+let regiaoOpen = null;
+function toggleRegiao() {
+  regiaoOpen = !regiaoOpen;
+  const body = document.getElementById('regiaoBody');
+  const arrow = document.getElementById('regiaoArrow');
+  body.style.display = regiaoOpen ? '' : 'none';
+  if (arrow) arrow.classList.toggle('open', regiaoOpen);
+}
+
+function initRegiaoOpen() {
+  if (regiaoOpen !== null) return;
+  regiaoOpen = window.innerWidth > 768;
+  const body = document.getElementById('regiaoBody');
+  const arrow = document.getElementById('regiaoArrow');
+  body.style.display = regiaoOpen ? '' : 'none';
+  if (arrow) arrow.classList.toggle('open', regiaoOpen);
+}
+
 // ── REGIÃO MAP ────────────────────────────────────────────────────────────
 const REGIAO_MAP = {
   'brasil':           ['brazil','brasil'],
@@ -1717,6 +1749,7 @@ function getRowRegiao(r) {
 }
 
 function renderRegiaoFilter() {
+  initRegiaoOpen();
   const grid = document.getElementById('regiaoGrid');
   if (!grid) return;
   const opts = [
@@ -1778,6 +1811,7 @@ window.enterMode = enterMode;
 window.toggleDiasFilter = toggleDiasFilter;
 window.toggleDate = toggleDate;
 window.toggleFeriados = toggleFeriados;
+window.toggleRegiao = toggleRegiao;
 window.selectMonth = selectMonth;
 window.selectDay = selectDay;
 window.goPage = goPage;
