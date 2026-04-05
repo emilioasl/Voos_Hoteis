@@ -72,16 +72,16 @@ header { border-bottom: 1px solid var(--border); padding: 14px 28px; display: fl
 #status-bar-mobile b { color: var(--mode-accent); }
 
 /* LAYOUT */
-.layout { display: grid; grid-template-columns: 210px 1fr; min-height: calc(100vh - 53px); }
+.layout { display: grid; grid-template-columns: 315px 1fr; min-height: calc(100vh - 53px); }
 
 /* SIDEBAR */
 aside { border-right: 1px solid var(--border); background: var(--surface); padding: 20px 0; position: sticky; top: 53px; height: calc(100vh - 53px); overflow-y: auto; }
-.sidebar-section { padding: 0 14px 10px; border-bottom: 1px solid var(--border); margin-bottom: 0; }
+.sidebar-section { padding: 0 14px 7px; border-bottom: 1px solid var(--border); margin-bottom: 0; }
 .sidebar-section:last-child { border-bottom: none; }
-.sidebar-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; color: var(--text-dim); margin-bottom: 10px; text-transform: uppercase; }
+.sidebar-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; color: var(--text-dim); margin-bottom: 7px; text-transform: uppercase; }
 
 /* COLLAPSIBLE */
-.collapse-header { display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; padding: 10px 0; }
+.collapse-header { display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; padding: 7px 0; }
 .collapse-header .sidebar-label { margin-bottom: 0; }
 .collapse-arrow { font-size: 10px; color: var(--text-dim); transition: transform 0.2s; display: inline-block; }
 .collapse-arrow.open { transform: rotate(180deg); }
@@ -276,9 +276,9 @@ td { padding: 9px 13px; vertical-align: middle; }
       <div class="sidebar-section" id="diasFilterSection" style="display:none">
         <div class="collapse-header" onclick="toggleDiasFilter()">
           <div class="sidebar-label">📆 Duração (dias) - opcional</div>
-          <span class="collapse-arrow open" id="diasFilterArrow">▼</span>
+          <span class="collapse-arrow" id="diasFilterArrow">▼</span>
         </div>
-        <div id="diasFilterBody" style="margin-top:10px">
+        <div id="diasFilterBody" style="display:none">
           <div class="city-grid" id="diasFilterGrid"></div>
         </div>
       </div>
@@ -1455,14 +1455,14 @@ function renderDiasFilter() {
     });
   });
 
-  // Collapse behavior — mobile starts closed, desktop open
+  // Collapse behavior — always starts closed (consistent with other filters)
   const arrow = document.getElementById('diasFilterArrow');
   const body = document.getElementById('diasFilterBody');
   if (!section._initialized) {
     section._initialized = true;
-    section._open = window.innerWidth > 768;
-    body.style.display = section._open ? '' : 'none';
-    if (arrow) arrow.classList.toggle('open', section._open);
+    section._open = false;
+    body.style.display = 'none';
+    if (arrow) arrow.classList.remove('open');
   }
 }
 
