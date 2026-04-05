@@ -220,14 +220,14 @@ td { padding: 9px 13px; vertical-align: middle; }
         <div class="sidebar-label">Busca rápida</div>
         <div class="search-wrap">
           <span class="si">🔍</span>
-          <input type="text" id="searchInput" placeholder="cidade, código, hotel...">
+          <input type="text" id="searchInput" placeholder="país, cidade, aeroporto, nome do hotel...">
         </div>
       </div>
 
       <!-- 2. FERIADOS -->
       <div class="sidebar-section" id="feriadosSection">
         <div class="collapse-header" onclick="toggleFeriados()">
-          <div class="sidebar-label">🗓️ Feriados</div>
+          <div class="sidebar-label">🗓️ Feriados - opcional</div>
           <span class="collapse-arrow" id="feriadosArrow">▼</span>
         </div>
         <div id="feriadosBody" style="margin-top:10px;display:none">
@@ -238,7 +238,7 @@ td { padding: 9px 13px; vertical-align: middle; }
       <!-- REGIAO: Brasil / Exterior -->
       <div class="sidebar-section" id="regiaoSection">
         <div class="collapse-header" onclick="toggleRegiao()">
-          <div class="sidebar-label">🌍 Região</div>
+          <div class="sidebar-label">🌍 Região - opcional</div>
           <span class="collapse-arrow" id="regiaoArrow">▼</span>
         </div>
         <div id="regiaoBody" style="display:flex;flex-direction:column;gap:5px;margin-top:10px">
@@ -249,7 +249,7 @@ td { padding: 9px 13px; vertical-align: middle; }
       <!-- FILTRO IDA/VOLTA -->
       <div class="sidebar-section" id="idaVoltaSection">
         <div class="collapse-header" onclick="toggleIdaVolta()">
-          <div class="sidebar-label">↔️ Tipo de voo</div>
+          <div class="sidebar-label">↔️ Tipo de voo - opcional</div>
           <span class="collapse-arrow" id="idaVoltaArrow">▼</span>
         </div>
         <div id="idaVoltaBody" style="display:none;flex-direction:column;gap:5px;margin-top:4px">
@@ -260,7 +260,7 @@ td { padding: 9px 13px; vertical-align: middle; }
       <!-- 3. FILTRAR DATA -->
       <div class="sidebar-section" id="dateSection" style="display:none">
         <div class="collapse-header" onclick="toggleDate()">
-          <div class="sidebar-label" id="dateLabel">Filtrar data</div>
+          <div class="sidebar-label" id="dateLabel">Filtrar data - opcional</div>
           <span class="collapse-arrow" id="dateArrow">▼</span>
         </div>
         <div id="dateFilterBody" style="margin-top:10px;display:none">
@@ -275,7 +275,7 @@ td { padding: 9px 13px; vertical-align: middle; }
       <!-- FILTRO DIAS -->
       <div class="sidebar-section" id="diasFilterSection" style="display:none">
         <div class="collapse-header" onclick="toggleDiasFilter()">
-          <div class="sidebar-label">📆 Duração (dias)</div>
+          <div class="sidebar-label">📆 Duração (dias) - opcional</div>
           <span class="collapse-arrow open" id="diasFilterArrow">▼</span>
         </div>
         <div id="diasFilterBody" style="margin-top:10px">
