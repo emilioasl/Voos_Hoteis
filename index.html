@@ -63,7 +63,7 @@ header { border-bottom: 1px solid var(--border); padding: 14px 28px; display: fl
 .header-mode { font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; padding: 4px 12px; border-radius: 6px; font-weight: 700; background: var(--mode-light); color: var(--mode-accent); border: 1px solid var(--mode-accent); white-space: nowrap; }
 .switch-btn { margin-left: auto; padding: 7px 16px; border-radius: 8px; border: 1.5px solid var(--border2); background: #fff; color: var(--text-muted); font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
 .switch-btn:hover { border-color: var(--mode-accent); color: var(--mode-accent); }
-.sticky-toggle-btn { margin-left: auto; padding: 7px 14px; border-radius: 8px; border: 1.5px solid var(--border2); background: #fff; color: var(--text-muted); font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+.sticky-toggle-btn { padding: 8px 20px; border-radius: 8px; border: 1.5px solid var(--border2); background: #fff; color: var(--text-muted); font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
 .sticky-toggle-btn:hover { border-color: var(--mode-accent); color: var(--mode-accent); }
 .sticky-toggle-btn.active { background: var(--mode-accent); border-color: var(--mode-accent); color: #fff; }
 #status-bar { font-family: var(--mono); font-size: 11px; color: var(--text-dim); }
@@ -178,7 +178,7 @@ td { padding: 9px 13px; vertical-align: middle; }
   #filesSection { border-bottom: 1px solid var(--border); }
   #status-bar { display: none; }
   #status-bar-mobile { display: block; }
-  .table-wrap { max-height: calc(100vh - 160px); }
+  body.sticky-header .table-wrap { max-height: calc(100vh - 160px); }
 }
 </style>
 </head>
@@ -210,9 +210,6 @@ td { padding: 9px 13px; vertical-align: middle; }
   <header>
     <div class="header-mode" id="headerMode">—</div>
     <div id="status-bar" style="display:none"></div>
-    <button class="sticky-toggle-btn" id="stickyToggleBtn" onclick="toggleStickyHeader()" title="Fixar cabeçalho da tabela">
-      📌 Header Off
-    </button>
     <button class="switch-btn" id="switchBtn" onclick="switchMode()">⇄ <span id="switchLabel">—</span></button>
   </header>
 
@@ -320,6 +317,12 @@ td { padding: 9px 13px; vertical-align: middle; }
             </div>
             <div class="file-list" id="fileList" style="padding-bottom:10px"></div>
           </div>
+        </div>
+        <!-- Sticky header toggle -->
+        <div style="margin-top:14px;display:flex;justify-content:center">
+          <button class="sticky-toggle-btn" id="stickyToggleBtn" onclick="toggleStickyHeader()">
+            📌 Header Off
+          </button>
         </div>
       </div>
     </main>
@@ -1765,9 +1768,12 @@ function toggleDate() {
 function goPage(page) {
   state.currentPage = page;
   renderTable();
-  const wrap = document.querySelector('.table-wrap');
-  if (wrap) wrap.scrollTop = 0;
-  else window.scrollTo({top: 0, behavior: 'smooth'});
+  if (document.body.classList.contains('sticky-header')) {
+    const wrap = document.querySelector('.table-wrap');
+    if (wrap) wrap.scrollTop = 0;
+  } else {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
 }
 
 
