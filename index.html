@@ -4203,14 +4203,99 @@ function getBestPriceByDest(rows) {
   return best;
 }
 
+// ── MAP CONSTANTS ──────────────────────────────────────────────────────────
+const MAP_PRICE_ZOOM_THRESHOLD = 4;  // zoom mínimo para mostrar preços
+const MAP_MAX_PRICE_LABELS     = 50; // máximo de preços visíveis ao mesmo tempo
+
+// Dot marker (sempre visível) — círculo pequeno
+function makeDotIcon(accentColor) {
+  return L.divIcon({
+    className: '',
+    html: `<div style="
+      width:10px;height:10px;border-radius:50%;
+      background:${accentColor};
+      border:2px solid rgba(255,255,255,0.6);
+      box-shadow:0 1px 4px rgba(0,0,0,0.5);
+      cursor:pointer;
+    "></div>`,
+    iconSize: [10, 10],
+    iconAnchor: [5, 5],
+  });
+}
+
+// Price label marker — só aparece com zoom suficiente
+function makePriceIcon(priceStr, accentColor) {
+  return L.divIcon({
+    className: '',
+    html: `<div style="
+      background:${accentColor};color:#fff;
+      font-family:'Space Mono',monospace;font-size:10px;font-weight:700;
+      padding:2px 7px;border-radius:10px;white-space:nowrap;
+      box-shadow:0 2px 8px rgba(0,0,0,0.5);cursor:pointer;
+      border:1.5px solid rgba(255,255,255,0.25);
+    ">${priceStr}</div>`,
+    iconAnchor: [0, 0],
+  });
+}
+
+// Price labels layer — rebuilt on every zoom/pan
+let _mapPoints    = [];   // all points (persists across zoom)
+let _dotMarkers   = [];   // dot markers (rebuilt on renderMap)
+let _priceMarkers = [];   // price labels (rebuilt on moveend/zoomend)
+let _mapListening = false;
+
+function _rebuildPriceLabels() {
+  if (!leafletMap) return;
+  // Remove old price labels
+  _priceMarkers.forEach(m => m.remove());
+  _priceMarkers = [];
+
+  const zoom = leafletMap.getZoom();
+  if (zoom < MAP_PRICE_ZOOM_THRESHOLD) return; // dots only at low zoom
+
+  const bounds = leafletMap.getBounds();
+  const accentColor = state.mode === 'voos' ? '#00875a' : '#0052cc';
+
+  // Filter points inside current viewport
+  const inView = _mapPoints.filter(p => {
+    const [lat, lng] = IATA_COORDS[p.iata];
+    return bounds.contains([lat, lng]);
+  });
+
+  // Sort by price, take cheapest 50
+  inView.sort((a, b) => a.price - b.price);
+  const top50 = inView.slice(0, MAP_MAX_PRICE_LABELS);
+
+  top50.forEach(p => {
+    const [lat, lng] = IATA_COORDS[p.iata];
+    const priceStr = `R$ ${fmtN(p.price)}`;
+    const icon = makePriceIcon(priceStr, accentColor);
+    const marker = L.marker([lat, lng], { icon, zIndexOffset: 1000 });
+
+    const idaFmt   = p.ida   ? fmtDate(p.ida)   : '';
+    const voltaFmt = p.volta && p.volta !== '-' ? fmtDate(p.volta) : '';
+    const diasStr  = p.dias  ? `${p.dias}d`     : '';
+    const linkBtn  = p.url   ? `<a href="${p.url}" target="_blank" rel="noopener noreferrer" class="map-popup-link">✈️ Ver oferta</a>` : '';
+
+    marker.bindPopup(`
+      <div class="map-popup-city">${p.city}${p.country ? ` <span style="font-weight:400;color:#9ba3b5">(${p.country})</span>` : ''}</div>
+      <div class="map-popup-price">${priceStr}</div>
+      <div class="map-popup-detail">${idaFmt ? `✈️ ${idaFmt}${voltaFmt ? ` → ${voltaFmt}` : ''}` : ''}${diasStr ? ` · ${diasStr}` : ''}</div>
+      ${linkBtn}
+    `, { maxWidth: 220 });
+
+    marker.addTo(leafletMap);
+    _priceMarkers.push(marker);
+  });
+}
+
 function renderMap() {
   const mapEl = document.getElementById('mapView');
   if (!mapEl) return;
 
-  // Fix #2 & #3: always use ALL filtered rows, never paginated
   const allRows = getAllFiltered();
   const bestByDest = getBestPriceByDest(allRows);
-  const points = Object.values(bestByDest);
+  _mapPoints = Object.values(bestByDest);
 
   // Init map once
   if (!leafletMap) {
@@ -4221,50 +4306,61 @@ function renderMap() {
       attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
       subdomains: 'abcd', maxZoom: 19,
     }).addTo(leafletMap);
-  } else {
-    mapMarkers.forEach(m => m.remove());
-    mapMarkers = [];
   }
 
+  // Remove old dot markers
+  _dotMarkers.forEach(m => m.remove());
+  _dotMarkers = [];
+  _priceMarkers.forEach(m => m.remove());
+  _priceMarkers = [];
+
+  // Remove old mapMarkers (legacy)
+  mapMarkers.forEach(m => m.remove());
+  mapMarkers = [];
+
   const accentColor = state.mode === 'voos' ? '#00875a' : '#0052cc';
+  const dotIcon = makeDotIcon(accentColor);
 
-  points.forEach(p => {
-    const [lat, lng] = IATA_COORDS[p.iata];
+  // Add dot for every destination (always visible)
+  _mapPoints.forEach(p => {
+    const coords = IATA_COORDS[p.iata];
+    if (!coords) return;
+    const [lat, lng] = coords;
+
+    const dot = L.marker([lat, lng], { icon: dotIcon });
+
+    // Dot popup shows price on click even at low zoom
     const priceStr = `R$ ${fmtN(p.price)}`;
-
-    const icon = L.divIcon({
-      className: '',
-      html: `<div style="
-        background:${accentColor};color:#fff;
-        font-family:'Space Mono',monospace;font-size:10px;font-weight:700;
-        padding:2px 6px;border-radius:10px;white-space:nowrap;
-        box-shadow:0 2px 8px rgba(0,0,0,0.5);cursor:pointer;
-        border:1.5px solid rgba(255,255,255,0.25);
-      ">${priceStr}</div>`,
-      iconAnchor: [0, 0],
-    });
-
-    const marker = L.marker([lat, lng], { icon });
-
-    const idaFmt  = p.ida   ? fmtDate(p.ida)   : '';
+    const idaFmt   = p.ida   ? fmtDate(p.ida)   : '';
     const voltaFmt = p.volta && p.volta !== '-' ? fmtDate(p.volta) : '';
-    const diasStr  = p.dias ? `${p.dias}d` : '';
-    const linkBtn  = p.url  ? `<a href="${p.url}" target="_blank" rel="noopener noreferrer" class="map-popup-link">✈️ Ver oferta</a>` : '';
+    const diasStr  = p.dias  ? `${p.dias}d`     : '';
+    const linkBtn  = p.url   ? `<a href="${p.url}" target="_blank" rel="noopener noreferrer" class="map-popup-link">✈️ Ver oferta</a>` : '';
 
-    marker.bindPopup(`
+    dot.bindPopup(`
       <div class="map-popup-city">${p.city}${p.country ? ` <span style="font-weight:400;color:#9ba3b5">(${p.country})</span>` : ''}</div>
       <div class="map-popup-price">${priceStr}</div>
       <div class="map-popup-detail">${idaFmt ? `✈️ ${idaFmt}${voltaFmt ? ` → ${voltaFmt}` : ''}` : ''}${diasStr ? ` · ${diasStr}` : ''}</div>
       ${linkBtn}
     `, { maxWidth: 220 });
 
-    marker.addTo(leafletMap);
-    mapMarkers.push(marker);
+    dot.addTo(leafletMap);
+    _dotMarkers.push(dot);
   });
 
-  if (points.length > 0) {
-    const coords = points.map(p => IATA_COORDS[p.iata]);
-    try { leafletMap.fitBounds(L.latLngBounds(coords), { padding: [30, 30], maxZoom: 7 }); } catch(e) {}
+  // Listen to zoom/pan — rebuild price labels on every move
+  if (!_mapListening) {
+    _mapListening = true;
+    leafletMap.on('moveend zoomend', _rebuildPriceLabels);
+  }
+
+  // Initial price labels
+  _rebuildPriceLabels();
+
+  if (_mapPoints.length > 0) {
+    const coords = _mapPoints
+      .filter(p => IATA_COORDS[p.iata])
+      .map(p => IATA_COORDS[p.iata]);
+    try { leafletMap.fitBounds(L.latLngBounds(coords), { padding: [30, 30], maxZoom: 5 }); } catch(e) {}
   }
 
   setTimeout(() => { if (leafletMap) leafletMap.invalidateSize(); }, 80);
