@@ -1055,36 +1055,22 @@ async function loadFromGitHub() {
       });
     }
 
-    // VOOS: para cada cidade, mantém só o preço do arquivo mais recente que a contém
-    // Se Frankfurt só aparece no arquivo antigo → usa esse. Se Paris aparece em vários → usa o mais novo.
+    // VOOS: mantém todas as linhas de todos os arquivos.
+    // Para cada cidade+data+preço, se aparecer em múltiplos arquivos, usa só o mais recente.
     if (state.mode === 'voos') {
-      const best = {}; // key: PARA → row com maior _file_date_ts
+      // Dedup: mesma cidade + mesma data de ida + mesmo preço → mantém só a do arquivo mais recente
+      const bestRow = {}; // key: PARA|DATA|PREÇO → row com maior _file_date_ts
       for (const row of state.allRows) {
-        const cityKey = (row['PARA'] || '').trim().toUpperCase();
-        if (!cityKey) continue;
-        if (!best[cityKey] || row._file_date_ts > best[cityKey]._file_date_ts) {
-          best[cityKey] = row;
+        const k = [
+          (row['PARA']        || '').trim().toUpperCase(),
+          (row['DATA_DE_IDA'] || '').trim(),
+          (row['PREÇO']       || '').trim(),
+        ].join('|');
+        if (!bestRow[k] || row._file_date_ts > bestRow[k]._file_date_ts) {
+          bestRow[k] = row;
         }
       }
-      // Agora expande: para cada cidade, pega TODAS as linhas do arquivo mais recente que a contém
-      const latestTsPerCity = best;
-      state.allRows = state.allRows.filter(row => {
-        const cityKey = (row['PARA'] || '').trim().toUpperCase();
-        return latestTsPerCity[cityKey] && row._file_date_ts === latestTsPerCity[cityKey]._file_date_ts;
-      });
-
-      // Remove duplicatas exatas: mesmo destino + mesma data de ida + mesmo preço
-      const seen = new Set();
-      state.allRows = state.allRows.filter(row => {
-        const k = [
-          (row['PARA']       || '').trim().toUpperCase(),
-          (row['DATA_DE_IDA']|| '').trim(),
-          (row['PREÇO']      || '').trim(),
-        ].join('|');
-        if (seen.has(k)) return false;
-        seen.add(k);
-        return true;
-      });
+      state.allRows = Object.values(bestRow);
     }
 
     // Normalize _dias for ALL voos rows — ensures sort works correctly
