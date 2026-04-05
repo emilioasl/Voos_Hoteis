@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Buscador de Viagens</title>
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <style>
 :root {
   --bg: #ffffff;
@@ -129,6 +130,17 @@ main { padding: 22px 26px; overflow-x: hidden; }
 .result-count { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--text-muted); }
 .result-count b { color: var(--text); }
 
+/* TABLE */
+#mapView { display:none; width:100%; height:calc(100vh - 160px); border-radius:var(--radius); border:1px solid var(--border); overflow:hidden; }
+.view-toggle-btn { padding:6px 14px; border-radius:var(--radius); border:1.5px solid var(--border2); background:#fff; color:var(--text-muted); font-size:12px; font-weight:600; cursor:pointer; transition:all 0.15s; display:flex; align-items:center; gap:6px; white-space:nowrap; }
+.view-toggle-btn:hover { border-color:var(--mode-accent); color:var(--mode-accent); }
+.view-toggle-btn.map-active { background:var(--mode-accent); border-color:var(--mode-accent); color:#fff; }
+.leaflet-popup-content-wrapper { border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,0.15); }
+.leaflet-popup-content { margin:10px 14px; font-family:'DM Sans',sans-serif; }
+.map-popup-city { font-size:13px; font-weight:600; color:#1a1d27; }
+.map-popup-price { font-size:15px; font-weight:700; color:var(--accent-v,#00875a); margin-top:2px; }
+.map-popup-detail { font-size:11px; color:#5a6072; margin-top:4px; }
+.map-popup-link { display:inline-block; margin-top:8px; padding:4px 10px; border-radius:5px; background:var(--accent-v,#00875a); color:#fff; font-size:11px; font-weight:600; text-decoration:none; }
 /* TABLE */
 .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -293,15 +305,17 @@ td { padding: 9px 13px; vertical-align: middle; }
       <div id="status-bar-mobile"></div>
       <div id="dataSection" style="display:none">
         <div class="toolbar">
+          <button class="view-toggle-btn" id="viewToggleBtn" onclick="toggleView()">🗺️ Mapa</button>
           <div class="sort-group" id="sortGroup"></div>
           <div class="result-count" id="resultCount"></div>
         </div>
-        <div class="table-wrap">
+        <div class="table-wrap" id="tableWrapEl">
           <table>
             <thead id="tableHead"></thead>
             <tbody id="tableBody"></tbody>
           </table>
         </div>
+        <div id="mapView"></div>
         <!-- paginationBar injected here by JS -->
         <!-- statsBar — arquivos/registros/destinos -->
         <div id="statsBar" style="display:none;margin-top:14px;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);font-family:var(--mono);font-size:11px;color:var(--text-muted);flex-wrap:wrap;gap:8px;align-items:center"></div>
@@ -329,6 +343,7 @@ td { padding: 9px 13px; vertical-align: middle; }
   </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
 // CONFIG
 const GITHUB_USER   = 'emilioasl';
@@ -347,6 +362,7 @@ const state = {
   regiaoFilter: [],    // [] = todos; array de vals selecionados
   diasFilter: 'ALL',   // 'ALL' | number of days as string
   idaVoltaFilter: 'ALL', // 'ALL' | 'ida' | 'idavolta'
+  viewMode: 'list',      // 'list' | 'map'
 };
 
 // ── UTILS ──────────────────────────────────────────────────────────────────
@@ -908,6 +924,7 @@ function enterMode(mode) {
   state.regiaoFilter = [];
   state.diasFilter = 'ALL';
   state.idaVoltaFilter = 'ALL';
+  state.viewMode = 'list';
   document.getElementById('landing').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   document.body.className = mode === 'voos' ? 'mode-voos' : '';
@@ -924,6 +941,14 @@ function switchMode() {
   state.regiaoFilter = [];
   state.diasFilter = 'ALL';
   state.idaVoltaFilter = 'ALL';
+  state.viewMode = 'list';
+  // Reset map view UI
+  const btn = document.getElementById('viewToggleBtn');
+  if (btn) { btn.textContent = '🗺️ Mapa'; btn.classList.remove('map-active'); }
+  const tw = document.getElementById('tableWrapEl');
+  const mv = document.getElementById('mapView');
+  if (tw) tw.style.display = '';
+  if (mv) mv.style.display = 'none';
   document.getElementById('searchInput').value = '';
   document.body.className = m === 'voos' ? 'mode-voos' : '';
   updateHeader(); showLoading(); loadFromGitHub();
@@ -1395,6 +1420,7 @@ function renderAllFilters() {
   renderIdaVoltaFilter();
   renderTable();
   updateStatus();
+  if (state.viewMode === 'map') renderMap();
 }
 
 function showLoading() {
@@ -1523,7 +1549,7 @@ function renderTable() {
   const nextDisabled = (state.currentPage + 1) * PAGE_SIZE >= total;
   const totalPages = Math.ceil(total / PAGE_SIZE);
   const curPage = state.currentPage + 1;
-  const tableWrap = document.querySelector('.table-wrap');
+  const tableWrap = document.getElementById('tableWrapEl');
 
   if (totalPages > 1) {
     const bar = document.createElement('div');
@@ -1769,7 +1795,7 @@ function goPage(page) {
   state.currentPage = page;
   renderTable();
   if (document.body.classList.contains('sticky-header')) {
-    const wrap = document.querySelector('.table-wrap');
+    const wrap = document.getElementById('tableWrapEl');
     if (wrap) wrap.scrollTop = 0;
   } else {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -2050,11 +2076,249 @@ function toggleStickyHeader() {
   }
   // Reset scroll position when toggling off
   if (!isOn) {
-    const wrap = document.querySelector('.table-wrap');
+    const wrap = document.getElementById('tableWrapEl');
     if (wrap) wrap.scrollTop = 0;
   }
 }
 window.toggleStickyHeader = toggleStickyHeader;
+
+// ── IATA COORDINATES ──────────────────────────────────────────────────────
+const IATA_COORDS = {
+  GRU:[-23.43,-46.47],VCP:[-22.99,-47.13],CGH:[-23.62,-46.66],BSB:[-15.87,-47.92],
+  GIG:[-22.81,-43.25],SDU:[-22.91,-43.17],SSA:[-12.91,-38.33],REC:[-8.13,-34.92],
+  FOR:[-3.78,-38.53],MAO:[-3.04,-60.05],BEL:[-1.38,-48.48],POA:[-29.99,-51.17],
+  CWB:[-25.53,-49.17],FLN:[-27.67,-48.55],CGR:[-20.47,-54.67],GYN:[-16.63,-49.22],
+  NAT:[-5.91,-35.25],MCZ:[-9.51,-35.79],THE:[-5.06,-42.82],SLZ:[-2.59,-44.24],
+  JPA:[-7.14,-34.95],AJU:[-10.98,-37.07],VIX:[-20.26,-40.29],UDI:[-18.88,-48.23],
+  BHZ:[-19.85,-43.97],CNF:[-19.63,-43.97],IMP:[-5.53,-47.46],MAB:[-5.37,-49.13],
+  IOS:[-14.82,-39.03],BPS:[-16.44,-39.08],IGU:[-25.60,-54.49],FEN:[-3.86,-32.42],
+  PMW:[-10.29,-48.36],CGB:[-15.65,-56.12],RBR:[-9.87,-67.90],PVH:[-8.71,-63.90],
+  MCP:[0.05,-51.07],BVB:[2.84,-60.69],STM:[-2.42,-54.79],CZS:[-7.60,-72.77],
+  LDB:[-23.33,-51.13],MGF:[-23.48,-52.01],JOI:[-26.22,-48.80],NVT:[-26.88,-48.65],
+  CPQ:[-23.00,-47.13],RAO:[-21.13,-47.77],SJP:[-20.82,-49.41],PPB:[-22.18,-51.42],
+  JDO:[-7.22,-39.27],CPV:[-7.27,-35.90],IPN:[-19.47,-42.49],GVR:[-18.90,-41.98],
+  UBA:[-19.76,-47.95],AQA:[-21.81,-48.14],JTC:[-22.16,-49.07],CFB:[-22.92,-42.07],
+  XAP:[-27.13,-52.66],CAC:[-25.00,-53.50],PFB:[-28.24,-52.33],CXJ:[-29.20,-51.19],
+  PET:[-31.72,-52.33],ROO:[-16.58,-54.72],OPS:[-11.88,-55.59],DOU:[-22.20,-54.93],
+  GEL:[-28.28,-54.17],ARU:[-21.14,-50.42],BYO:[-21.12,-56.52],CLV:[-17.72,-48.61],
+  // Internacional Americas
+  EZE:[-34.82,-58.54],AEP:[-34.56,-58.42],GRU:[-23.43,-46.47],
+  SCL:[-33.39,-70.79],LIM:[-12.02,-77.11],BOG:[-4.70,-74.15],
+  UIO:[-0.13,-78.49],MVD:[-34.84,-56.01],ASU:[-25.24,-57.52],
+  LPB:[-16.51,-68.19],VVI:[-17.64,-63.13],GYE:[-2.16,-79.88],
+  CCS:[10.60,-66.99],PBM:[5.45,-55.19],GEO:[6.50,-58.25],CAY:[4.82,-52.37],
+  CUN:[21.04,-86.87],MEX:[19.44,-99.07],GDL:[20.52,-103.31],MTY:[25.77,-100.11],
+  MID:[20.94,-89.66],OAX:[17.00,-96.73],SJD:[23.15,-109.72],PVR:[20.68,-105.25],
+  MZT:[23.16,-106.27],TIJ:[32.54,-116.97],ACA:[16.76,-99.75],CZM:[20.52,-86.93],
+  PUJ:[18.57,-68.36],SDQ:[18.43,-69.67],HAV:[22.99,-82.41],NAS:[25.04,-77.47],
+  GCM:[19.29,-81.36],MBJ:[18.50,-77.91],KIN:[17.94,-76.79],PTY:[9.07,-79.38],
+  SJO:[9.99,-84.21],GUA:[14.58,-90.53],SAL:[13.44,-89.06],MGA:[12.14,-86.17],
+  TGU:[14.06,-87.22],SJU:[18.44,-65.99],BGI:[13.07,-59.49],POS:[10.60,-61.34],
+  TAB:[11.15,-60.83],AUA:[12.50,-70.01],CUR:[12.20,-68.96],SXM:[18.04,-63.11],
+  BON:[12.13,-68.27],GCM:[19.29,-81.36],
+  // EUA & Canadá
+  JFK:[40.64,-73.78],LAX:[33.94,-118.41],ORD:[41.98,-87.91],ATL:[33.64,-84.43],
+  DFW:[32.90,-97.04],DEN:[39.86,-104.67],SFO:[37.62,-122.38],SEA:[47.45,-122.31],
+  MIA:[25.79,-80.29],BOS:[42.36,-71.01],EWR:[40.69,-74.17],IAD:[38.94,-77.46],
+  LAS:[36.08,-115.15],PHX:[33.44,-112.01],MCO:[28.43,-81.31],IAH:[29.99,-95.34],
+  MSP:[44.88,-93.22],DTW:[42.21,-83.35],PHL:[39.87,-75.24],CLT:[35.21,-80.94],
+  FLL:[26.07,-80.15],BWI:[39.18,-76.67],SLC:[40.79,-111.98],ANC:[61.17,-150.02],
+  HNL:[21.32,-157.92],YYZ:[43.68,-79.63],YVR:[49.19,-123.18],YUL:[45.47,-73.74],
+  YYC:[51.13,-114.01],YOW:[45.32,-75.67],
+  // Europa
+  LHR:[51.48,-0.45],CDG:[49.01,2.55],FRA:[50.03,8.57],AMS:[52.31,4.76],
+  MAD:[40.49,-3.57],BCN:[41.30,2.08],FCO:[41.80,12.25],MXP:[45.63,8.72],
+  MUC:[48.35,11.79],VIE:[48.11,16.57],ZRH:[47.46,8.55],BRU:[50.90,4.48],
+  CPH:[55.62,12.66],ARN:[59.65,17.92],HEL:[60.32,24.96],OSL:[60.20,11.08],
+  LIS:[38.77,-9.13],OPO:[41.24,-8.68],DUB:[53.42,-6.27],MAN:[53.35,-2.27],
+  EDI:[55.95,-3.37],ATH:[37.94,23.95],IST:[40.98,28.82],SAW:[40.90,29.31],
+  WAW:[52.17,20.97],PRG:[50.10,14.26],BUD:[47.44,19.26],BEG:[44.82,20.31],
+  OTP:[44.57,26.10],SOF:[42.69,23.41],SKG:[40.52,22.97],LJU:[46.22,14.46],
+  ZAG:[45.74,16.07],DBV:[42.56,18.27],SPU:[43.54,16.30],TIA:[41.42,19.72],
+  SKP:[41.96,21.62],KLU:[46.64,14.34],GRZ:[46.99,15.44],LNZ:[48.23,14.19],
+  SZG:[47.79,13.00],INN:[47.26,11.34],GVA:[46.24,6.11],BSL:[47.59,7.53],
+  LUG:[46.00,8.91],NCE:[43.66,7.21],LYS:[45.72,5.08],MRS:[43.44,5.22],
+  TLS:[43.63,1.37],BOD:[44.83,-0.72],NTE:[47.15,-1.61],STR:[48.69,9.22],
+  DUS:[51.29,6.77],HAM:[53.63,10.00],BER:[52.37,13.50],LEJ:[51.42,12.24],
+  NUE:[49.50,11.07],BRE:[53.04,8.79],HAN:[20.22,105.81],
+  // Ásia & Oriente Médio
+  DXB:[25.25,55.37],AUH:[24.43,54.65],DOH:[25.27,51.61],KWI:[29.23,47.97],
+  BAH:[26.27,50.64],RUH:[24.96,46.70],JED:[21.68,39.16],CAI:[30.12,31.41],
+  TLV:[32.01,34.89],BEY:[33.82,35.49],AMM:[31.72,35.99],DAM:[33.41,36.52],
+  HKG:[22.31,113.91],SIN:[1.36,103.99],BKK:[13.69,100.75],KUL:[2.75,101.71],
+  CGK:[-6.13,106.65],MNL:[14.51,121.02],NRT:[35.77,140.39],HND:[35.55,139.78],
+  ICN:[37.46,126.44],PUS:[35.18,128.94],PEK:[40.08,116.60],PVG:[31.14,121.81],
+  HKG:[22.31,113.91],CAN:[23.39,113.30],SZX:[22.64,113.81],CTU:[30.58,103.95],
+  KMG:[24.99,102.74],XIY:[34.45,108.75],CKG:[29.72,106.64],HGH:[30.23,120.43],
+  NKG:[31.74,118.86],TAO:[36.27,120.38],WUH:[30.78,114.21],CSX:[28.19,113.22],
+  SHA:[31.20,121.34],DEL:[28.56,77.10],BOM:[19.09,72.87],BLR:[13.20,77.71],
+  MAA:[12.99,80.18],HYD:[17.23,78.43],CCU:[22.65,88.45],COK:[10.15,76.40],
+  GOI:[15.38,73.83],AMD:[23.07,72.63],JAI:[26.82,75.81],ATQ:[31.71,74.80],
+  KTM:[27.70,85.36],DAC:[23.84,90.40],CMB:[7.18,79.88],RGN:[16.90,96.13],
+  PNH:[11.55,104.84],REP:[13.41,103.82],VTE:[17.99,102.56],SGN:[10.82,106.67],
+  HAN:[21.22,105.81],DPS:[-8.75,115.17],SUB:[-7.38,112.79],JOG:[-7.79,110.43],
+  UPG:[-5.06,119.55],KNO:[3.64,98.89],HKT:[8.11,98.30],USM:[9.55,100.06],
+  CNX:[18.77,98.96],HDY:[6.93,100.43],MFM:[22.15,113.59],TPE:[25.08,121.23],
+  KHH:[22.58,120.35],ULN:[47.84,106.77],KHI:[24.90,67.16],LHE:[31.52,74.40],
+  ISB:[33.62,73.10],TAS:[41.26,69.28],ALA:[43.35,77.04],
+  // África
+  JNB:[-26.13,28.24],CPT:[-33.96,18.60],DUR:[-29.97,30.95],
+  NBO:[-1.32,36.93],MBA:[-4.03,39.59],ADD:[8.98,38.80],DAR:[-6.88,39.20],
+  LOS:[6.58,3.32],ABV:[9.01,7.27],ACC:[5.60,-0.17],CMN:[33.37,-7.59],
+  RAK:[31.60,-8.04],TUN:[36.85,10.23],ALG:[36.69,3.22],LBV:[0.46,9.41],
+  DKR:[14.74,-17.49],NIM:[13.48,2.18],BKO:[12.53,-7.95],OUA:[12.35,-1.51],
+  NDJ:[12.13,15.03],BGF:[4.40,18.52],LFW:[6.17,1.25],COO:[6.36,2.38],
+  MPM:[-25.92,32.57],LAD:[-8.86,13.23],LUN:[-15.33,28.45],HRE:[-17.93,31.10],
+  NAS:[25.04,-77.47],TNR:[-18.80,47.48],MRU:[-20.43,57.68],SEZ:[-4.67,55.52],
+  // Oceania
+  SYD:[-33.95,151.18],MEL:[-37.67,144.84],BNE:[-27.38,153.12],PER:[-31.94,115.97],
+  ADL:[-34.95,138.53],DRW:[-12.41,130.88],CNS:[-16.89,145.75],OOL:[-28.17,153.51],
+  AKL:[-37.01,174.79],CHC:[-43.49,172.53],WLG:[-41.33,174.81],ZQN:[-45.02,168.74],
+  NAN:[-17.75,177.45],SUV:[-18.05,178.56],APW:[-13.83,-172.00],
+  PPT:[-17.55,-149.61],NOU:[-22.01,166.22],POM:[-9.44,147.22],HIR:[-9.43,160.05],
+};
+
+// ── MAP STATE ─────────────────────────────────────────────────────────────
+let leafletMap = null;
+let mapMarkers = [];
+
+function toggleView() {
+  state.viewMode = state.viewMode === 'list' ? 'map' : 'list';
+  const btn = document.getElementById('viewToggleBtn');
+  const tableWrap = document.getElementById('tableWrapEl');
+  const mapView = document.getElementById('mapView');
+  const sortGroup = document.getElementById('sortGroup');
+  const paginationBar = document.getElementById('paginationBar');
+
+  if (state.viewMode === 'map') {
+    btn.textContent = '📋 Lista';
+    btn.classList.add('map-active');
+    tableWrap.style.display = 'none';
+    if (paginationBar) paginationBar.style.display = 'none';
+    mapView.style.display = 'block';
+    sortGroup.style.opacity = '0.3';
+    sortGroup.style.pointerEvents = 'none';
+    renderMap();
+  } else {
+    btn.textContent = '🗺️ Mapa';
+    btn.classList.remove('map-active');
+    tableWrap.style.display = '';
+    if (paginationBar) paginationBar.style.display = '';
+    mapView.style.display = 'none';
+    sortGroup.style.opacity = '';
+    sortGroup.style.pointerEvents = '';
+  }
+}
+
+function getBestPriceByDest(rows) {
+  // Returns map: IATA -> {city, country, price, url, ida, volta, dias}
+  const priceKey = state.mode === 'hoteis' ? 'Final Price' : 'PREÇO';
+  const destKey  = state.mode === 'hoteis' ? 'City' : 'PARA';
+  const cityKey  = state.mode === 'hoteis' ? 'City Name' : 'CIDADE';
+  const countryKey = state.mode === 'hoteis' ? 'Country' : 'PAÍS';
+
+  const best = {};
+  for (const r of rows) {
+    const iata = (r[destKey] || '').trim().toUpperCase();
+    if (!iata || !IATA_COORDS[iata]) continue;
+    const price = parsePrice(r[priceKey]);
+    if (!price) continue;
+    if (!best[iata] || price < best[iata].price) {
+      best[iata] = {
+        iata, price,
+        city: r[cityKey] || r[destKey] || iata,
+        country: r[countryKey] || '',
+        url: r.URL || r.url_flight || '',
+        ida: r['DATA_DE_IDA'] || r['Checkin_Date'] || '',
+        volta: r['DATA_VOLTA'] || r['Checkout_Date'] || '',
+        dias: r['_dias'] || r['# Days'] || '',
+      };
+    }
+  }
+  return best;
+}
+
+function renderMap() {
+  const mapEl = document.getElementById('mapView');
+  if (!mapEl) return;
+
+  // Get ALL filtered rows (no pagination)
+  const allRows = getAllFiltered();
+  const bestByDest = getBestPriceByDest(allRows);
+  const points = Object.values(bestByDest);
+
+  // Init map once
+  if (!leafletMap) {
+    leafletMap = L.map('mapView', {
+      center: [15, 0],
+      zoom: 2,
+      minZoom: 2,
+      maxZoom: 12,
+    });
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
+      subdomains: 'abcd',
+      maxZoom: 19,
+    }).addTo(leafletMap);
+  } else {
+    // Clear old markers
+    mapMarkers.forEach(m => m.remove());
+    mapMarkers = [];
+  }
+
+  if (!points.length) return;
+
+  const accentColor = state.mode === 'voos' ? '#00875a' : '#0052cc';
+
+  points.forEach(p => {
+    const [lat, lng] = IATA_COORDS[p.iata];
+    const priceStr = `R$ ${fmtN(p.price)}`;
+
+    // Custom price label icon
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="
+        background:${accentColor};color:#fff;
+        font-family:'Space Mono',monospace;font-size:11px;font-weight:700;
+        padding:3px 7px;border-radius:12px;white-space:nowrap;
+        box-shadow:0 2px 8px rgba(0,0,0,0.4);cursor:pointer;
+        border:1.5px solid rgba(255,255,255,0.3);
+      ">${priceStr}</div>`,
+      iconAnchor: [0, 0],
+    });
+
+    const marker = L.marker([lat, lng], { icon });
+
+    const idaFmt = p.ida ? fmtDate(p.ida) : '';
+    const voltaFmt = p.volta && p.volta !== '-' ? fmtDate(p.volta) : '';
+    const diasStr = p.dias ? `${p.dias}d` : '';
+    const linkBtn = p.url ? `<a href="${p.url}" target="_blank" rel="noopener noreferrer" class="map-popup-link">✈️ Ver oferta</a>` : '';
+
+    marker.bindPopup(`
+      <div class="map-popup-city">${p.city}${p.country ? ` <span style="font-weight:400;color:#9ba3b5">(${p.country})</span>` : ''}</div>
+      <div class="map-popup-price">${priceStr}</div>
+      <div class="map-popup-detail">
+        ${idaFmt ? `✈️ ${idaFmt}${voltaFmt ? ` → ${voltaFmt}` : ''}` : ''}
+        ${diasStr ? ` · ${diasStr}` : ''}
+      </div>
+      ${linkBtn}
+    `, { maxWidth: 220 });
+
+    marker.addTo(leafletMap);
+    mapMarkers.push(marker);
+  });
+
+  // Fit map to markers
+  if (points.length > 0) {
+    const coords = points.map(p => IATA_COORDS[p.iata]);
+    try { leafletMap.fitBounds(L.latLngBounds(coords), { padding: [40, 40], maxZoom: 6 }); } catch(e) {}
+  }
+
+  // Force Leaflet to recalculate size (container may have just appeared)
+  setTimeout(() => { if (leafletMap) leafletMap.invalidateSize(); }, 50);
+}
+
+window.toggleView = toggleView;
 </script>
 </body>
 </html>
