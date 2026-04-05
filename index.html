@@ -131,14 +131,12 @@ main { padding: 22px 26px; overflow-x: hidden; }
 .result-count b { color: var(--text); }
 
 /* TABLE */
-#mapView { width:100%; height:calc(100vh - 160px); border-radius:var(--radius); border:1px solid var(--border); overflow:hidden; }
-/* Desktop: lista + mapa lado a lado */
+#mapView { width:100%; height:calc(100vh - 160px); border-radius:var(--radius); border:1px solid var(--border); overflow:hidden; display:none; }
 #contentRow { display:flex; gap:16px; align-items:flex-start; }
 #listCol { flex:2; min-width:0; }
-#mapCol { flex:1; min-width:0; position:sticky; top:53px; }
-#mapCol #mapView { display:block !important; height:calc(100vh - 130px); }
-.view-toggle-btn { display:none; } /* hidden on desktop — both always visible */
-.view-toggle-btn { padding:6px 14px; border-radius:var(--radius); border:1.5px solid var(--border2); background:#fff; color:var(--text-muted); font-size:12px; font-weight:600; cursor:pointer; transition:all 0.15s; display:flex; align-items:center; gap:6px; white-space:nowrap; }
+#mapCol { flex:1; min-width:0; position:sticky; top:53px; display:none; }
+#mapCol #mapView { display:block; height:calc(100vh - 130px); }
+.view-toggle-btn { padding:6px 14px; border-radius:var(--radius); border:1.5px solid var(--border2); background:#fff; color:var(--text-muted); font-size:12px; font-weight:600; cursor:pointer; transition:all 0.15s; display:none; align-items:center; gap:6px; white-space:nowrap; }
 .view-toggle-btn:hover { border-color:var(--mode-accent); color:var(--mode-accent); }
 .view-toggle-btn.map-active { background:var(--mode-accent); border-color:var(--mode-accent); color:#fff; }
 .leaflet-popup-content-wrapper { border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,0.15); }
@@ -200,9 +198,10 @@ td { padding: 9px 13px; vertical-align: middle; }
   /* Mobile: toggle button shows, split hidden */
   .view-toggle-btn { display:flex !important; }
   #contentRow { display:block; }
-  #mapCol { position:static; }
-  #mapCol #mapView { display:none; height:calc(100vh - 160px); }
-  #mapCol #mapView.mobile-map-visible { display:block !important; }
+  #mapCol { position:static; display:none !important; }
+  #mapCol #mapView { display:none !important; height:calc(100vh - 160px); }
+  #mapCol.mobile-map-visible { display:block !important; }
+  #mapCol.mobile-map-visible #mapView { display:block !important; }
   #listCol .table-wrap { display:block; }
   #listCol .table-wrap.mobile-hidden { display:none; }
 }
@@ -962,13 +961,16 @@ function switchMode() {
   state.diasFilter = 'ALL';
   state.idaVoltaFilter = 'ALL';
   state.viewMode = 'list';
-  // Reset map view UI
+  // Reset mobile toggle button
   const btn = document.getElementById('viewToggleBtn');
   if (btn) { btn.textContent = '🗺️ Mapa'; btn.classList.remove('map-active'); }
+  // Reset mobile list/map visibility
   const tw = document.getElementById('tableWrapEl');
-  const mv = document.getElementById('mapView');
-  if (tw) tw.style.display = '';
-  if (mv) mv.style.display = 'none';
+  const mc = document.getElementById('mapCol');
+  if (tw) tw.classList.remove('mobile-hidden');
+  if (mc) mc.classList.remove('mobile-map-visible');
+  // Hide desktop map until new data loads
+  hideDesktopMap();
   document.getElementById('searchInput').value = '';
   document.body.className = m === 'voos' ? 'mode-voos' : '';
   updateHeader(); showLoading(); loadFromGitHub();
@@ -1416,7 +1418,7 @@ function getDests() {
 }
 
 // ── RENDER ─────────────────────────────────────────────────────────────────
-function render() { renderFileList(); renderDateFilter(); renderDiasFilter(); renderFeriadosFilter(); renderRegiaoFilter(); renderIdaVoltaFilter(); renderSortBar(); renderTable(); updateStatus(); maybeRenderMap(); }
+function render() { renderFileList(); renderDateFilter(); renderDiasFilter(); renderFeriadosFilter(); renderRegiaoFilter(); renderIdaVoltaFilter(); renderSortBar(); renderTable(); updateStatus(); showDesktopMap(); }
 
 // Chamado após qualquer mudança de filtro — atualiza TUDO
 function renderAllFilters() {
@@ -4099,9 +4101,9 @@ const isMobileView = () => window.innerWidth <= 768;
 function toggleView() {
   if (!isMobileView()) return; // no-op on desktop
   state.viewMode = state.viewMode === 'list' ? 'map' : 'list';
-  const btn = document.getElementById('viewToggleBtn');
-  const tableWrap = document.getElementById('tableWrapEl');
-  const mapView = document.getElementById('mapView');
+  const btn        = document.getElementById('viewToggleBtn');
+  const tableWrap  = document.getElementById('tableWrapEl');
+  const mapCol     = document.getElementById('mapCol');
   const paginationBar = document.getElementById('paginationBar');
 
   if (state.viewMode === 'map') {
@@ -4109,16 +4111,47 @@ function toggleView() {
     btn.classList.add('map-active');
     tableWrap.classList.add('mobile-hidden');
     if (paginationBar) paginationBar.style.display = 'none';
-    mapView.classList.add('mobile-map-visible');
+    mapCol.classList.add('mobile-map-visible');
     renderMap();
   } else {
     btn.textContent = '🗺️ Mapa';
     btn.classList.remove('map-active');
     tableWrap.classList.remove('mobile-hidden');
     if (paginationBar) paginationBar.style.display = '';
-    mapView.classList.remove('mobile-map-visible');
+    mapCol.classList.remove('mobile-map-visible');
   }
 }
+
+// Desktop: show mapCol and render map when data is loaded
+function showDesktopMap() {
+  if (isMobileView()) return;
+  const mapCol = document.getElementById('mapCol');
+  if (mapCol) mapCol.style.display = 'block';
+  renderMap();
+}
+
+// Hide desktop map (e.g. when switching modes / no data)
+function hideDesktopMap() {
+  if (isMobileView()) return;
+  const mapCol = document.getElementById('mapCol');
+  if (mapCol) mapCol.style.display = 'none';
+  // Destroy markers but keep leaflet instance
+  mapMarkers.forEach(m => m.remove());
+  mapMarkers = [];
+}
+
+function maybeRenderMap() {
+  if (isMobileView()) {
+    // Mobile: only render if user explicitly switched to map view
+    if (state.viewMode === 'map') renderMap();
+  } else {
+    // Desktop: render if mapCol is visible
+    const mapCol = document.getElementById('mapCol');
+    if (mapCol && mapCol.style.display !== 'none') renderMap();
+  }
+}
+
+window.toggleView = toggleView;
 
 function getBestPriceByDest(rows) {
   const priceKey   = state.mode === 'hoteis' ? 'Final Price' : 'PREÇO';
@@ -4215,11 +4248,6 @@ function renderMap() {
   }
 
   setTimeout(() => { if (leafletMap) leafletMap.invalidateSize(); }, 80);
-}
-
-// On desktop, map always renders alongside list
-function maybeRenderMap() {
-  if (!isMobileView() || state.viewMode === 'map') renderMap();
 }
 
 window.toggleView = toggleView;
