@@ -131,7 +131,13 @@ main { padding: 22px 26px; overflow-x: hidden; }
 .result-count b { color: var(--text); }
 
 /* TABLE */
-#mapView { display:none; width:100%; height:calc(100vh - 160px); border-radius:var(--radius); border:1px solid var(--border); overflow:hidden; }
+#mapView { width:100%; height:calc(100vh - 160px); border-radius:var(--radius); border:1px solid var(--border); overflow:hidden; }
+/* Desktop: lista + mapa lado a lado */
+#contentRow { display:flex; gap:16px; align-items:flex-start; }
+#listCol { flex:2; min-width:0; }
+#mapCol { flex:1; min-width:0; position:sticky; top:53px; }
+#mapCol #mapView { display:block !important; height:calc(100vh - 130px); }
+.view-toggle-btn { display:none; } /* hidden on desktop — both always visible */
 .view-toggle-btn { padding:6px 14px; border-radius:var(--radius); border:1.5px solid var(--border2); background:#fff; color:var(--text-muted); font-size:12px; font-weight:600; cursor:pointer; transition:all 0.15s; display:flex; align-items:center; gap:6px; white-space:nowrap; }
 .view-toggle-btn:hover { border-color:var(--mode-accent); color:var(--mode-accent); }
 .view-toggle-btn.map-active { background:var(--mode-accent); border-color:var(--mode-accent); color:#fff; }
@@ -191,6 +197,14 @@ td { padding: 9px 13px; vertical-align: middle; }
   #status-bar { display: none; }
   #status-bar-mobile { display: block; }
   body.sticky-header .table-wrap { max-height: calc(100vh - 160px); }
+  /* Mobile: toggle button shows, split hidden */
+  .view-toggle-btn { display:flex !important; }
+  #contentRow { display:block; }
+  #mapCol { position:static; }
+  #mapCol #mapView { display:none; height:calc(100vh - 160px); }
+  #mapCol #mapView.mobile-map-visible { display:block !important; }
+  #listCol .table-wrap { display:block; }
+  #listCol .table-wrap.mobile-hidden { display:none; }
 }
 </style>
 </head>
@@ -232,7 +246,7 @@ td { padding: 9px 13px; vertical-align: middle; }
         <div class="sidebar-label">Busca rápida</div>
         <div class="search-wrap">
           <span class="si">🔍</span>
-          <input type="text" id="searchInput" placeholder="país, cidade, aeroporto, nome do hotel...">
+          <input type="text" id="searchInput" placeholder="país, cidade, aeroporto...">
         </div>
       </div>
 
@@ -309,14 +323,20 @@ td { padding: 9px 13px; vertical-align: middle; }
           <div class="sort-group" id="sortGroup"></div>
           <div class="result-count" id="resultCount"></div>
         </div>
-        <div class="table-wrap" id="tableWrapEl">
-          <table>
-            <thead id="tableHead"></thead>
-            <tbody id="tableBody"></tbody>
-          </table>
+        <div id="contentRow">
+          <div id="listCol">
+            <div class="table-wrap" id="tableWrapEl">
+              <table>
+                <thead id="tableHead"></thead>
+                <tbody id="tableBody"></tbody>
+              </table>
+            </div>
+            <!-- paginationBar injected here by JS -->
+          </div>
+          <div id="mapCol">
+            <div id="mapView"></div>
+          </div>
         </div>
-        <div id="mapView"></div>
-        <!-- paginationBar injected here by JS -->
         <!-- statsBar — arquivos/registros/destinos -->
         <div id="statsBar" style="display:none;margin-top:14px;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);font-family:var(--mono);font-size:11px;color:var(--text-muted);flex-wrap:wrap;gap:8px;align-items:center"></div>
         <!-- Arquivos carregados -->
@@ -958,7 +978,8 @@ function updateHeader() {
   const isH = state.mode === 'hoteis';
   document.getElementById('headerMode').textContent = isH ? '🏨✈️  Voos e Hotéis' : '✈️  Apenas Voos';
   document.getElementById('switchLabel').textContent = isH ? 'Apenas Voos' : 'Voos e Hotéis';
-  // destLabel removed
+  const si = document.getElementById('searchInput');
+  if (si) si.placeholder = isH ? 'país, cidade, aeroporto, hotel...' : 'país, cidade, aeroporto...';
 }
 
 // ── COLLAPSE ───────────────────────────────────────────────────────────────
@@ -1409,7 +1430,7 @@ function getDests() {
 }
 
 // ── RENDER ─────────────────────────────────────────────────────────────────
-function render() { renderFileList(); renderDateFilter(); renderDiasFilter(); renderFeriadosFilter(); renderRegiaoFilter(); renderIdaVoltaFilter(); renderSortBar(); renderTable(); updateStatus(); }
+function render() { renderFileList(); renderDateFilter(); renderDiasFilter(); renderFeriadosFilter(); renderRegiaoFilter(); renderIdaVoltaFilter(); renderSortBar(); renderTable(); updateStatus(); maybeRenderMap(); }
 
 // Chamado após qualquer mudança de filtro — atualiza TUDO
 function renderAllFilters() {
@@ -1420,7 +1441,7 @@ function renderAllFilters() {
   renderIdaVoltaFilter();
   renderTable();
   updateStatus();
-  if (state.viewMode === 'map') renderMap();
+  maybeRenderMap();
 }
 
 function showLoading() {
@@ -2181,46 +2202,46 @@ const IATA_COORDS = {
 // ── MAP STATE ─────────────────────────────────────────────────────────────
 let leafletMap = null;
 let mapMarkers = [];
+const isMobileView = () => window.innerWidth <= 768;
 
+// Mobile only: toggle between list and map
 function toggleView() {
+  if (!isMobileView()) return; // no-op on desktop
   state.viewMode = state.viewMode === 'list' ? 'map' : 'list';
   const btn = document.getElementById('viewToggleBtn');
   const tableWrap = document.getElementById('tableWrapEl');
   const mapView = document.getElementById('mapView');
-  const sortGroup = document.getElementById('sortGroup');
   const paginationBar = document.getElementById('paginationBar');
 
   if (state.viewMode === 'map') {
     btn.textContent = '📋 Lista';
     btn.classList.add('map-active');
-    tableWrap.style.display = 'none';
+    tableWrap.classList.add('mobile-hidden');
     if (paginationBar) paginationBar.style.display = 'none';
-    mapView.style.display = 'block';
-    sortGroup.style.opacity = '0.3';
-    sortGroup.style.pointerEvents = 'none';
+    mapView.classList.add('mobile-map-visible');
     renderMap();
   } else {
     btn.textContent = '🗺️ Mapa';
     btn.classList.remove('map-active');
-    tableWrap.style.display = '';
+    tableWrap.classList.remove('mobile-hidden');
     if (paginationBar) paginationBar.style.display = '';
-    mapView.style.display = 'none';
-    sortGroup.style.opacity = '';
-    sortGroup.style.pointerEvents = '';
+    mapView.classList.remove('mobile-map-visible');
   }
 }
 
 function getBestPriceByDest(rows) {
-  // Returns map: IATA -> {city, country, price, url, ida, volta, dias}
-  const priceKey = state.mode === 'hoteis' ? 'Final Price' : 'PREÇO';
-  const destKey  = state.mode === 'hoteis' ? 'City' : 'PARA';
-  const cityKey  = state.mode === 'hoteis' ? 'City Name' : 'CIDADE';
+  const priceKey   = state.mode === 'hoteis' ? 'Final Price' : 'PREÇO';
+  const destKey    = state.mode === 'hoteis' ? 'City' : 'PARA';
+  const cityKey    = state.mode === 'hoteis' ? 'City Name' : 'CIDADE';
   const countryKey = state.mode === 'hoteis' ? 'Country' : 'PAÍS';
 
   const best = {};
   for (const r of rows) {
     const iata = (r[destKey] || '').trim().toUpperCase();
-    if (!iata || !IATA_COORDS[iata]) continue;
+    // Fix #3: also try matching by city name if IATA not found directly
+    if (!iata) continue;
+    const coords = IATA_COORDS[iata];
+    if (!coords) continue;
     const price = parsePrice(r[priceKey]);
     if (!price) continue;
     if (!best[iata] || price < best[iata].price) {
@@ -2242,7 +2263,7 @@ function renderMap() {
   const mapEl = document.getElementById('mapView');
   if (!mapEl) return;
 
-  // Get ALL filtered rows (no pagination)
+  // Fix #2 & #3: always use ALL filtered rows, never paginated
   const allRows = getAllFiltered();
   const bestByDest = getBestPriceByDest(allRows);
   const points = Object.values(bestByDest);
@@ -2250,23 +2271,16 @@ function renderMap() {
   // Init map once
   if (!leafletMap) {
     leafletMap = L.map('mapView', {
-      center: [15, 0],
-      zoom: 2,
-      minZoom: 2,
-      maxZoom: 12,
+      center: [15, 0], zoom: 2, minZoom: 1, maxZoom: 14,
     });
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
       attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
-      subdomains: 'abcd',
-      maxZoom: 19,
+      subdomains: 'abcd', maxZoom: 19,
     }).addTo(leafletMap);
   } else {
-    // Clear old markers
     mapMarkers.forEach(m => m.remove());
     mapMarkers = [];
   }
-
-  if (!points.length) return;
 
   const accentColor = state.mode === 'voos' ? '#00875a' : '#0052cc';
 
@@ -2274,33 +2288,29 @@ function renderMap() {
     const [lat, lng] = IATA_COORDS[p.iata];
     const priceStr = `R$ ${fmtN(p.price)}`;
 
-    // Custom price label icon
     const icon = L.divIcon({
       className: '',
       html: `<div style="
         background:${accentColor};color:#fff;
-        font-family:'Space Mono',monospace;font-size:11px;font-weight:700;
-        padding:3px 7px;border-radius:12px;white-space:nowrap;
-        box-shadow:0 2px 8px rgba(0,0,0,0.4);cursor:pointer;
-        border:1.5px solid rgba(255,255,255,0.3);
+        font-family:'Space Mono',monospace;font-size:10px;font-weight:700;
+        padding:2px 6px;border-radius:10px;white-space:nowrap;
+        box-shadow:0 2px 8px rgba(0,0,0,0.5);cursor:pointer;
+        border:1.5px solid rgba(255,255,255,0.25);
       ">${priceStr}</div>`,
       iconAnchor: [0, 0],
     });
 
     const marker = L.marker([lat, lng], { icon });
 
-    const idaFmt = p.ida ? fmtDate(p.ida) : '';
+    const idaFmt  = p.ida   ? fmtDate(p.ida)   : '';
     const voltaFmt = p.volta && p.volta !== '-' ? fmtDate(p.volta) : '';
-    const diasStr = p.dias ? `${p.dias}d` : '';
-    const linkBtn = p.url ? `<a href="${p.url}" target="_blank" rel="noopener noreferrer" class="map-popup-link">✈️ Ver oferta</a>` : '';
+    const diasStr  = p.dias ? `${p.dias}d` : '';
+    const linkBtn  = p.url  ? `<a href="${p.url}" target="_blank" rel="noopener noreferrer" class="map-popup-link">✈️ Ver oferta</a>` : '';
 
     marker.bindPopup(`
       <div class="map-popup-city">${p.city}${p.country ? ` <span style="font-weight:400;color:#9ba3b5">(${p.country})</span>` : ''}</div>
       <div class="map-popup-price">${priceStr}</div>
-      <div class="map-popup-detail">
-        ${idaFmt ? `✈️ ${idaFmt}${voltaFmt ? ` → ${voltaFmt}` : ''}` : ''}
-        ${diasStr ? ` · ${diasStr}` : ''}
-      </div>
+      <div class="map-popup-detail">${idaFmt ? `✈️ ${idaFmt}${voltaFmt ? ` → ${voltaFmt}` : ''}` : ''}${diasStr ? ` · ${diasStr}` : ''}</div>
       ${linkBtn}
     `, { maxWidth: 220 });
 
@@ -2308,14 +2318,17 @@ function renderMap() {
     mapMarkers.push(marker);
   });
 
-  // Fit map to markers
   if (points.length > 0) {
     const coords = points.map(p => IATA_COORDS[p.iata]);
-    try { leafletMap.fitBounds(L.latLngBounds(coords), { padding: [40, 40], maxZoom: 6 }); } catch(e) {}
+    try { leafletMap.fitBounds(L.latLngBounds(coords), { padding: [30, 30], maxZoom: 7 }); } catch(e) {}
   }
 
-  // Force Leaflet to recalculate size (container may have just appeared)
-  setTimeout(() => { if (leafletMap) leafletMap.invalidateSize(); }, 50);
+  setTimeout(() => { if (leafletMap) leafletMap.invalidateSize(); }, 80);
+}
+
+// On desktop, map always renders alongside list
+function maybeRenderMap() {
+  if (!isMobileView() || state.viewMode === 'map') renderMap();
 }
 
 window.toggleView = toggleView;
