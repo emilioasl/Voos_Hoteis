@@ -1468,6 +1468,49 @@ function debouncedRender() {
   window._filterDebounce = setTimeout(renderAllFilters, 500);
 }
 
+// Cache de counts — evita getAllFiltered() em cada click de feriado/região
+let _cachedFeriadoCounts = null;  // { feriadoName: count }
+let _cachedRegiaoCounts  = null;  // { regiaoVal: count }
+let _cachedBaseLen       = -1;    // total rows na última contagem
+
+function _invalidateCountCache() {
+  _cachedFeriadoCounts = null;
+  _cachedRegiaoCounts  = null;
+  _cachedBaseLen       = -1;
+}
+
+function _getFeriadoCounts() {
+  const baseRows = getAllFiltered({ feriadoFilter: [] });
+  if (_cachedFeriadoCounts && _cachedBaseLen === baseRows.length) return _cachedFeriadoCounts;
+  const idaKey   = state.mode === 'hoteis' ? 'Checkin_Date' : 'DATA_DE_IDA';
+  const voltaKey = state.mode === 'hoteis' ? 'Checkout_Date' : 'DATA_VOLTA';
+  _cachedFeriadoCounts = {};
+  _cachedBaseLen = baseRows.length;
+  FERIADOS.forEach(o => {
+    _cachedFeriadoCounts[o.name] = baseRows.filter(r => {
+      const ida = getRowDate(r, idaKey); if (!ida) return false;
+      if (!dateInFeriado(ida, o)) return false;
+      if (o.voltaMax || o.voltaMin) {
+        const volta = getRowDate(r, voltaKey); if (!volta) return false;
+        const v = midnightOf(volta);
+        if (o.voltaMax && v > new Date(ida.getFullYear(), o.voltaMax.m-1, o.voltaMax.d)) return false;
+        if (o.voltaMin && v < new Date(ida.getFullYear(), o.voltaMin.m-1, o.voltaMin.d)) return false;
+      }
+      return true;
+    }).length;
+  });
+  return _cachedFeriadoCounts;
+}
+
+function _getRegiaoCounts() {
+  const baseRows = getAllFiltered({ regiaoFilter: [] });
+  if (_cachedRegiaoCounts && _cachedBaseLen === baseRows.length) return _cachedRegiaoCounts;
+  _cachedRegiaoCounts = {};
+  _cachedBaseLen = baseRows.length;
+  baseRows.forEach(r => { const reg = getRowRegiao(r); if (reg) _cachedRegiaoCounts[reg] = (_cachedRegiaoCounts[reg]||0)+1; });
+  return _cachedRegiaoCounts;
+}
+
 function showLoading() {
   document.getElementById('loadingBox').style.display = 'block';
   document.getElementById('loadingBox').innerHTML = '<span class="spinner"></span>buscando CSVs...';
@@ -1710,7 +1753,7 @@ document.getElementById('searchInput').addEventListener('input', e => { state.se
     // Debounce: espera 220ms após última tecla antes de filtrar
     clearTimeout(window._searchDebounce);
     window._searchDebounce = setTimeout(() => {
-      // Search só precisa re-renderizar a tabela — não os filtros de sidebar
+      _invalidateCountCache();
       renderTable(); updateStatus(); maybeRenderMap();
     }, 220);
   });
@@ -1825,12 +1868,14 @@ function selectMonth(mon) {
   state.selectedMonth = mon;
   state.selectedDay = 'ALL';
   state.currentPage = 0;
+  _invalidateCountCache();
   debouncedRender();
 }
 
 function selectDay(day) {
   state.selectedDay = day;
   state.currentPage = 0;
+  _invalidateCountCache();
   debouncedRender();
 }
 
@@ -1861,23 +1906,12 @@ function renderFeriadosFilter() {
   const grid = document.getElementById('feriadosGrid');
   if (!grid) return;
 
-  // Base rows ignoring feriado filter — to count hits per feriado
+  // Usa cache de counts — evita getAllFiltered() em cada click
+  const feriadoCounts = _getFeriadoCounts();
   const baseRows = getAllFiltered({ feriadoFilter: [] });
-  const idaKey   = state.mode === 'hoteis' ? 'Checkin_Date' : 'DATA_DE_IDA';
-  const voltaKey = state.mode === 'hoteis' ? 'Checkout_Date' : 'DATA_VOLTA';
 
   function countFeriado(feriado) {
-    return baseRows.filter(r => {
-      const ida = getRowDate(r, idaKey); if (!ida) return false;
-      if (!dateInFeriado(ida, feriado)) return false;
-      if (feriado.voltaMax || feriado.voltaMin) {
-        const volta = getRowDate(r, voltaKey); if (!volta) return false;
-        const v = midnightOf(volta);
-        if (feriado.voltaMax && v > new Date(ida.getFullYear(), feriado.voltaMax.m-1, feriado.voltaMax.d)) return false;
-        if (feriado.voltaMin && v < new Date(ida.getFullYear(), feriado.voltaMin.m-1, feriado.voltaMin.d)) return false;
-      }
-      return true;
-    }).length;
+    return feriadoCounts[feriado.name] || 0;
   }
 
   const allActive = state.feriadoFilter.length === 0;
@@ -2059,10 +2093,9 @@ function renderRegiaoFilter() {
     { val: 'oriente_medio',   label: '🕌 Oriente Médio' },
   ];
 
-  // Base rows ignoring regiao filter — to count per region
+  // Usa cache de counts — evita getAllFiltered() em cada click
+  const countByRegiao = _getRegiaoCounts();
   const baseRows = getAllFiltered({ regiaoFilter: [] });
-  const countByRegiao = {};
-  baseRows.forEach(r => { const reg = getRowRegiao(r); if (reg) countByRegiao[reg] = (countByRegiao[reg]||0) + 1; });
 
   const allActive = state.regiaoFilter.length === 0;
   const allBtn = `<button data-rval="ALL" style="
