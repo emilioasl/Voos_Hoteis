@@ -1073,7 +1073,13 @@ async function loadFromGitHub() {
             row['_dias'] = '';
           }
         }
-        state.allRows.push({ ...row, _file_date: date, _file_date_ts: dateTs, _is_latest: f.isLatest });
+        const _r = { ...row, _file_date: date, _file_date_ts: dateTs, _is_latest: f.isLatest };
+        // Pré-computa string de busca normalizada — evita normalize() em runtime
+        const _norm = s => (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+        _r._searchIdx = [_r.PARA, _r.CIDADE, _r['PAÍS'], _r.DE,
+                         _r.City, _r['City Name'], _r.Country, _r['Hotel Name']]
+                        .map(_norm).join(' ');
+        state.allRows.push(_r);
       });
     }
 
@@ -1283,15 +1289,16 @@ function getFiltered() {
       for (const term of aliasTerms) { if (f.includes(term)) return true; }
       return false;
     };
-    if (state.mode === 'hoteis') {
-      rows = rows.filter(r =>
-        matches(r.City) || matches(r['City Name']) || matches(r.Country) || matches(r['Hotel Name'])
-      );
-    } else {
-      rows = rows.filter(r =>
-        matches(r.PARA) || matches(r.CIDADE) || matches(r['PAÍS']) || matches(r.DE)
-      );
-    }
+    // Usa índice pré-computado — muito mais rápido em 100k+ linhas
+    rows = rows.filter(r => {
+      if (r._searchIdx) {
+        for (const term of aliasTerms) { if (r._searchIdx.includes(term)) return true; }
+        return false;
+      }
+      // fallback se índice não existir
+      if (state.mode === 'hoteis') return matches(r.City) || matches(r['City Name']) || matches(r.Country) || matches(r['Hotel Name']);
+      return matches(r.PARA) || matches(r.CIDADE) || matches(r['PAÍS']) || matches(r.DE);
+    });
   }
 
   // Feriado filter (multi-select — OR entre feriados selecionados)
@@ -1390,8 +1397,11 @@ function getAllFiltered(overrides = {}) {
       if (nk === q || nk.startsWith(q) || q.startsWith(nk)) { aliasTerms.add(nk); vals.forEach(v => aliasTerms.add(norm(v))); }
     }
     const matches = f => { const fn = norm(f); for (const t of aliasTerms) { if (fn.includes(t)) return true; } return false; };
-    if (state.mode === 'hoteis') rows = rows.filter(r => matches(r.City) || matches(r['City Name']) || matches(r.Country) || matches(r['Hotel Name']));
-    else rows = rows.filter(r => matches(r.PARA) || matches(r.CIDADE) || matches(r['PAÍS']) || matches(r.DE));
+    rows = rows.filter(r => {
+      if (r._searchIdx) { for (const t of aliasTerms) { if (r._searchIdx.includes(t)) return true; } return false; }
+      if (state.mode === 'hoteis') return matches(r.City) || matches(r['City Name']) || matches(r.Country) || matches(r['Hotel Name']);
+      return matches(r.PARA) || matches(r.CIDADE) || matches(r['PAÍS']) || matches(r.DE);
+    });
   }
   if (state.feriadoFilter.length > 0) {
     const selF = FERIADOS.filter(f => state.feriadoFilter.includes(f.name));
@@ -1690,7 +1700,14 @@ function setSort(col) {
   else { state.sortCol = col; state.sortAsc = true; }
   renderSortBar(); renderTable();
 }
-document.getElementById('searchInput').addEventListener('input', e => { state.search = e.target.value; state.currentPage = 0; renderAllFilters(); });
+document.getElementById('searchInput').addEventListener('input', e => { state.search = e.target.value; state.currentPage = 0;
+    // Debounce: espera 220ms após última tecla antes de filtrar
+    clearTimeout(window._searchDebounce);
+    window._searchDebounce = setTimeout(() => {
+      // Search só precisa re-renderizar a tabela — não os filtros de sidebar
+      renderTable(); updateStatus(); maybeRenderMap();
+    }, 220);
+  });
 
 function toggleDiasFilter() {
   const section = document.getElementById('diasFilterSection');
