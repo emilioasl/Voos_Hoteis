@@ -1004,13 +1004,13 @@ function enterMode(mode) {
   state.feriadoFilter = [];
   state.regiaoFilter = [];
   state.diasFilter = 'ALL';
-  state.idaVoltaFilter = 'ALL';
+  state.idaVoltaFilter = 'idavolta';
   state.viewMode = 'list';
   document.getElementById('landing').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   document.body.className = mode === 'voos' ? 'mode-voos' : '';
   updateHeader();
-  _updateToggleVisibility(); // sync toggles before data loads
+  requestAnimationFrame(_updateToggleVisibility); // sync after DOM paint
   loadFromGitHub();
 }
 
@@ -1632,14 +1632,19 @@ function _updateToggleVisibility() {
   // idaVolta toggle — only in voos mode
   const ivt = document.getElementById('idaVoltaToggle');
   if (ivt) ivt.style.display = state.mode === 'voos' ? '' : 'none';
-  // Sync pill states with current state
+  // Sync class filter pills
   ['ECO','EXE'].forEach(v => {
     const btn = document.getElementById('classBtn_' + v);
-    if (btn) btn.classList.toggle('active', v === state.classFilter);
+    if (!btn) return;
+    btn.classList.remove('active');
+    if (v === state.classFilter) btn.classList.add('active');
   });
+  // Sync ida/volta pills
   ['idavolta','ida','ALL'].forEach(v => {
     const btn = document.getElementById('ivBtn_' + v);
-    if (btn) btn.classList.toggle('active', v === state.idaVoltaFilter);
+    if (!btn) return;
+    btn.classList.remove('active');
+    if (v === state.idaVoltaFilter) btn.classList.add('active');
   });
 }
 function debouncedRender() {
