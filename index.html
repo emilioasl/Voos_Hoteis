@@ -34,6 +34,22 @@ body.mode-voos {
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; }
 
+
+/* ── TOGGLE PILL ── */
+.toggle-pill {
+  display: flex; border-radius: 8px; overflow: hidden;
+  border: 1.5px solid var(--border2); background: var(--surface2);
+  width: 100%;
+}
+.toggle-pill button {
+  flex: 1; padding: 7px 0; font-size: 12px; font-weight: 500;
+  border: none; background: transparent; color: var(--text-muted);
+  cursor: pointer; transition: all 0.15s; font-family: var(--sans);
+}
+.toggle-pill button.active {
+  background: var(--mode-accent); color: #fff; font-weight: 600;
+}
+
 /* ── LANDING ── */
 #landing {
   min-height: 100vh; display: flex; flex-direction: column;
@@ -260,6 +276,17 @@ td { padding: 9px 13px; vertical-align: middle; }
           <span class="si">🔍</span>
           <input type="text" id="searchInput" placeholder="país, cidade, aeroporto...">
         </div>
+        <!-- TOGGLE: Econômico / Executivo -->
+        <div class="toggle-pill" id="classToggle" style="margin-top:10px">
+          <button id="classBtn_ECO" onclick="setClassFilter('ECO')" class="active">Econômico</button>
+          <button id="classBtn_EXE" onclick="setClassFilter('EXE')">Executivo</button>
+        </div>
+        <!-- TOGGLE: Ida e Volta / Apenas Ida / Todos (voos only) -->
+        <div class="toggle-pill" id="idaVoltaToggle" style="margin-top:6px;display:none">
+          <button id="ivBtn_idavolta" onclick="setIdaVoltaToggle('idavolta')" class="active">Ida e Volta</button>
+          <button id="ivBtn_ida"      onclick="setIdaVoltaToggle('ida')">Apenas Ida</button>
+          <button id="ivBtn_ALL"      onclick="setIdaVoltaToggle('ALL')">Todos</button>
+        </div>
       </div>
 
       <!-- 2. FERIADOS -->
@@ -393,9 +420,10 @@ const state = {
   feriadoFilter: [],   // [] = todos; array de names selecionados
   regiaoFilter: [],    // [] = todos; array de vals selecionados
   diasFilter: 'ALL',   // 'ALL' | number of days as string
-  idaVoltaFilter: 'ALL', // 'ALL' | 'ida' | 'idavolta'
+  idaVoltaFilter: 'idavolta', // 'idavolta' | 'ida' | 'ALL'
   viewMode: 'list',      // 'list' | 'map'
   selectedOrigin: 'ALL', // 'ALL' | código IATA da origem (SAO, FLN, GIG...)
+  classFilter: 'ECO',    // 'ECO' | 'EXE'
 };
 
 // ── UTILS ──────────────────────────────────────────────────────────────────
@@ -993,9 +1021,10 @@ function switchMode() {
   state.feriadoFilter = [];
   state.regiaoFilter = [];
   state.diasFilter = 'ALL';
-  state.idaVoltaFilter = 'ALL';
+  state.idaVoltaFilter = 'idavolta';
   state.viewMode = 'list';
   state.selectedOrigin = 'ALL';
+  state.classFilter = 'ECO';
   // Reset mobile toggle button
   const btn = document.getElementById('viewToggleBtn');
   if (btn) { btn.textContent = '🗺️ Mapa'; btn.classList.remove('map-active'); }
@@ -1037,7 +1066,15 @@ async function loadFromGitHub() {
 
     const pat = state.mode === 'hoteis' ? PATTERN_HOTEIS : PATTERN_VOOS;
     let files = data.tree
-      .filter(f => f.type === 'blob' && f.path.includes(pat) && f.path.endsWith('.csv'))
+      .filter(f => {
+        if (f.type !== 'blob' || !f.path.includes(pat) || !f.path.endsWith('.csv')) return false;
+        // classFilter: ECO/EXE in filename (voos: _ECO_compilado / _EXE_compilado; hoteis: future)
+        if (state.classFilter !== 'ALL') {
+          const name = f.path.split('/').pop();
+          if (!name.includes('_' + state.classFilter + '_')) return false;
+        }
+        return true;
+      })
       .map(f => ({ path: f.path, name: f.path.split('/').pop() }));
 
     // Ordena pelo nome (YYYY-MM-DD está embutido), pega os mais recentes
@@ -1143,6 +1180,7 @@ async function loadFromGitHub() {
     state.sortCol = state.mode === 'hoteis' ? 'Final Price' : 'PREÇO';
     state.sortAsc = true;
     state.currentPage = 0;
+    _updateToggleVisibility();
     render();
   } catch (err) {
     document.getElementById('loadingBox').innerHTML = `<span style="color:#e85d04">⚠️ Erro: ${err.message}</span>`;
@@ -1471,7 +1509,7 @@ function getDests() {
 }
 
 // ── RENDER ─────────────────────────────────────────────────────────────────
-function render() { renderFileList(); renderOriginFilter(); renderDateFilter(); renderDiasFilter(); renderFeriadosFilter(); renderRegiaoFilter(); renderIdaVoltaFilter(); renderSortBar(); renderTable(); updateStatus(); showDesktopMap(); }
+function render() { _updateToggleVisibility(); renderFileList(); renderOriginFilter(); renderDateFilter(); renderDiasFilter(); renderFeriadosFilter(); renderRegiaoFilter(); renderIdaVoltaFilter(); renderSortBar(); renderTable(); updateStatus(); showDesktopMap(); }
 
 // Chamado após qualquer mudança de filtro — atualiza TUDO
 
@@ -1558,12 +1596,50 @@ function resetAllFilters() {
   state.feriadoFilter   = [];
   state.regiaoFilter    = [];
   state.diasFilter      = 'ALL';
-  state.idaVoltaFilter  = 'ALL';
+  state.idaVoltaFilter  = 'idavolta';
   state.selectedOrigin  = 'ALL';
+  state.classFilter     = 'ECO';
   const inp = document.getElementById('searchInput');
   if (inp) inp.value = '';
   _invalidateCountCache();
   render();
+}
+
+function setClassFilter(val) {
+  state.classFilter = val;
+  // Update pill button styles
+  ['ECO','EXE'].forEach(v => {
+    const btn = document.getElementById('classBtn_' + v);
+    if (btn) btn.classList.toggle('active', v === val);
+  });
+  // Reload data with new file pattern
+  state.files = []; state.allRows = []; state.currentPage = 0;
+  showLoading(); loadFromGitHub();
+}
+
+function setIdaVoltaToggle(val) {
+  state.idaVoltaFilter = val;
+  ['idavolta','ida','ALL'].forEach(v => {
+    const btn = document.getElementById('ivBtn_' + v);
+    if (btn) btn.classList.toggle('active', v === val);
+  });
+  state.currentPage = 0;
+  debouncedRender();
+}
+
+function _updateToggleVisibility() {
+  // idaVolta toggle — only in voos mode
+  const ivt = document.getElementById('idaVoltaToggle');
+  if (ivt) ivt.style.display = state.mode === 'voos' ? '' : 'none';
+  // Sync pill states with current state
+  ['ECO','EXE'].forEach(v => {
+    const btn = document.getElementById('classBtn_' + v);
+    if (btn) btn.classList.toggle('active', v === state.classFilter);
+  });
+  ['idavolta','ida','ALL'].forEach(v => {
+    const btn = document.getElementById('ivBtn_' + v);
+    if (btn) btn.classList.toggle('active', v === state.idaVoltaFilter);
+  });
 }
 function debouncedRender() {
   clearTimeout(window._filterDebounce);
