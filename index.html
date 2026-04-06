@@ -1493,6 +1493,11 @@ function renderOriginFilter() {
   // Hide if only 1 origin
   if (origins.length <= 1) { section.style.display = 'none'; return; }
 
+  // Default to SAO if not yet set and SAO exists
+  if (state.selectedOrigin === 'ALL' && origins.includes('SAO')) {
+    state.selectedOrigin = 'SAO';
+  }
+
   section.style.display = 'block';
   const grid = document.getElementById('originGrid');
   if (!grid) return;
@@ -1639,10 +1644,9 @@ function renderDiasFilter() {
   if (state.mode !== 'voos') { section.style.display = 'none'; return; }
 
   // Get ALL currently filtered rows (ignoring dias filter) — not just current page
-  const filteredRows = getAllFiltered({ diasFilter: 'ALL' });
-
+  // Sem getAllFiltered — usa allRows direto para pegar lista de dias disponíveis
   const diasSet = new Set();
-  filteredRows.forEach(r => { if (r._dias) diasSet.add(String(r._dias)); });
+  state.allRows.forEach(r => { if (r._dias) diasSet.add(String(r._dias)); });
 
   const dias = [...diasSet].sort((a, b) => parseInt(a) - parseInt(b));
   if (!dias.length) { section.style.display = 'none'; return; }
@@ -1653,9 +1657,8 @@ function renderDiasFilter() {
   grid.innerHTML =
     `<button class="city-btn all-btn ${allActive ? 'active' : ''}" data-dval="ALL">TODOS</button>` +
     dias.map(d => {
-      const count = filteredRows.filter(r => String(r._dias) === d).length;
       const isActive = state.diasFilter === d;
-      return `<button class="city-btn ${isActive ? 'active' : ''}" data-dval="${d}">${d}d<br><span style="font-size:9px;opacity:0.6">${count}</span></button>`;
+      return `<button class="city-btn ${isActive ? 'active' : ''}" data-dval="${d}">${d}d</button>`;
     }).join('');
 
   grid.querySelectorAll('button[data-dval]').forEach(btn => {
@@ -2026,37 +2029,20 @@ function renderFeriadosFilter() {
   const grid = document.getElementById('feriadosGrid');
   if (!grid) return;
 
-  // Usa cache de counts — evita getAllFiltered() em cada click
-  const feriadoCounts = _getFeriadoCounts();
-  const baseRows = getAllFiltered({ feriadoFilter: [] });
-
-  function countFeriado(feriado) {
-    return feriadoCounts[feriado.name] || 0;
-  }
-
+  // Sem counts — instantâneo
   const allActive = state.feriadoFilter.length === 0;
-  const allBtn = `<button data-fidx="-1" style="
+  const btnStyle = (active) => `
     text-align:left;padding:7px 10px;border-radius:6px;font-size:12px;cursor:pointer;
-    border:1.5px solid ${allActive ? 'var(--mode-accent)' : 'var(--border)'};
-    background:${allActive ? 'var(--mode-light)' : '#fff'};
-    color:${allActive ? 'var(--mode-accent)' : 'var(--text-muted)'};
-    font-weight:${allActive ? '600' : '400'};
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-  ">📅 Todas as datas <span style="font-size:10px;opacity:0.6">${baseRows.length}</span></button>`;
+    border:1.5px solid ${active ? 'var(--mode-accent)' : 'var(--border)'};
+    background:${active ? 'var(--mode-light)' : '#fff'};
+    color:${active ? 'var(--mode-accent)' : 'var(--text-muted)'};
+    font-weight:${active ? '600' : '400'};
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;`;
 
+  const allBtn = `<button data-fidx="-1" style="${btnStyle(allActive)}">📅 Todas as datas</button>`;
   const ferBtns = FERIADOS.map((o, i) => {
     const isActive = state.feriadoFilter.includes(o.name);
-    const count = countFeriado(o);
-    if (count === 0 && !isActive) return ''; // hide feriados with 0 results
-    return `<button data-fidx="${i}" style="
-      text-align:left;padding:7px 10px;border-radius:6px;font-size:12px;cursor:pointer;
-      border:1.5px solid ${isActive ? 'var(--mode-accent)' : 'var(--border)'};
-      background:${isActive ? 'var(--mode-light)' : '#fff'};
-      color:${isActive ? 'var(--mode-accent)' : 'var(--text-muted)'};
-      font-weight:${isActive ? '600' : '400'};
-      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-      display:flex;justify-content:space-between;align-items:center;gap:6px;
-    ">${o.name}<span style="font-size:10px;opacity:0.5;flex-shrink:0">${count}</span></button>`;
+    return `<button data-fidx="${i}" style="${btnStyle(isActive)}">${o.name}</button>`;
   }).join('');
 
   grid.innerHTML = allBtn + ferBtns;
@@ -2064,9 +2050,8 @@ function renderFeriadosFilter() {
   grid.querySelectorAll('button[data-fidx]').forEach(btn => {
     btn.addEventListener('click', () => {
       const idx = parseInt(btn.getAttribute('data-fidx'));
-      if (idx === -1) {
-        state.feriadoFilter = [];
-      } else {
+      if (idx === -1) { state.feriadoFilter = []; }
+      else {
         const name = FERIADOS[idx].name;
         const pos = state.feriadoFilter.indexOf(name);
         if (pos >= 0) state.feriadoFilter.splice(pos, 1);
@@ -2089,11 +2074,11 @@ function toggleFeriados() {
 
 function initFeriadosOpen() {
   if (feriadosOpen !== null) return;
-  feriadosOpen = window.innerWidth > 768;
+  feriadosOpen = false; // sempre começa fechado
   const body = document.getElementById('feriadosBody');
   const arrow = document.getElementById('feriadosArrow');
-  body.style.display = feriadosOpen ? '' : 'none';
-  if (arrow) arrow.classList.toggle('open', feriadosOpen);
+  body.style.display = 'none';
+  if (arrow) arrow.classList.remove('open');
 }
 
 let regiaoOpen = null;
@@ -2107,11 +2092,11 @@ function toggleRegiao() {
 
 function initRegiaoOpen() {
   if (regiaoOpen !== null) return;
-  regiaoOpen = window.innerWidth > 768;
+  regiaoOpen = false; // sempre começa fechado
   const body = document.getElementById('regiaoBody');
   const arrow = document.getElementById('regiaoArrow');
-  body.style.display = regiaoOpen ? '' : 'none';
-  if (arrow) arrow.classList.toggle('open', regiaoOpen);
+  body.style.display = 'none';
+  if (arrow) arrow.classList.remove('open');
 }
 
 let idaVoltaOpen = null;
@@ -2125,11 +2110,11 @@ function toggleIdaVolta() {
 
 function initIdaVoltaOpen() {
   if (idaVoltaOpen !== null) return;
-  idaVoltaOpen = window.innerWidth > 768;
+  idaVoltaOpen = false; // sempre começa fechado
   const body = document.getElementById('idaVoltaBody');
   const arrow = document.getElementById('idaVoltaArrow');
-  if (body) body.style.display = idaVoltaOpen ? 'flex' : 'none';
-  if (arrow) arrow.classList.toggle('open', idaVoltaOpen);
+  if (body) body.style.display = 'none';
+  if (arrow) arrow.classList.remove('open');
 }
 
 function renderIdaVoltaFilter() {
@@ -2142,27 +2127,21 @@ function renderIdaVoltaFilter() {
   const grid = document.getElementById('idaVoltaGrid');
   if (!grid) return;
 
-  // Base rows ignoring idaVolta filter
-  const baseRows = getAllFiltered({ idaVoltaFilter: 'ALL' });
-  const hasVolta = r => { const v=(r.DATA_VOLTA||'').trim(); return v&&v!=='-'&&v.toLowerCase()!=='unknown'; };
-  const countIda     = baseRows.filter(r => !hasVolta(r)).length;
-  const countIdaVolta = baseRows.filter(r => hasVolta(r)).length;
-
+  // Sem counts — instantâneo
   const opts = [
-    { val: 'ALL',      label: '↔️ Todos',      count: baseRows.length },
-    { val: 'ida',      label: '➡️ Apenas Ida',  count: countIda },
-    { val: 'idavolta', label: '↩️ Ida e Volta', count: countIdaVolta },
+    { val: 'ALL',      label: '↔️ Todos' },
+    { val: 'ida',      label: '➡️ Apenas Ida' },
+    { val: 'idavolta', label: '↩️ Ida e Volta' },
   ];
+  const ivStyle = (active) => `
+    text-align:left;padding:7px 10px;border-radius:6px;font-size:12px;cursor:pointer;
+    border:1.5px solid ${active ? 'var(--mode-accent)' : 'var(--border)'};
+    background:${active ? 'var(--mode-light)' : '#fff'};
+    color:${active ? 'var(--mode-accent)' : 'var(--text-muted)'};
+    font-weight:${active ? '600' : '400'};`;
   grid.innerHTML = opts.map(o => {
     const isActive = state.idaVoltaFilter === o.val;
-    return `<button data-ivval="${o.val}" style="
-      text-align:left;padding:7px 10px;border-radius:6px;font-size:12px;cursor:pointer;
-      border:1.5px solid ${isActive ? 'var(--mode-accent)' : 'var(--border)'};
-      background:${isActive ? 'var(--mode-light)' : '#fff'};
-      color:${isActive ? 'var(--mode-accent)' : 'var(--text-muted)'};
-      font-weight:${isActive ? '600' : '400'};
-      display:flex;justify-content:space-between;align-items:center;gap:6px;
-    ">${o.label}<span style="font-size:10px;opacity:0.5;flex-shrink:0">${o.count}</span></button>`;
+    return `<button data-ivval="${o.val}" style="${ivStyle(isActive)}">${o.label}</button>`;
   }).join('');
   grid.querySelectorAll('button[data-ivval]').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -2213,32 +2192,19 @@ function renderRegiaoFilter() {
     { val: 'oriente_medio',   label: '🕌 Oriente Médio' },
   ];
 
-  // Usa cache de counts — evita getAllFiltered() em cada click
-  const countByRegiao = _getRegiaoCounts();
-  const baseRows = getAllFiltered({ regiaoFilter: [] });
-
+  // Sem counts — instantâneo
   const allActive = state.regiaoFilter.length === 0;
-  const allBtn = `<button data-rval="ALL" style="
+  const rStyle = (active) => `
     text-align:left;padding:7px 10px;border-radius:6px;font-size:12px;cursor:pointer;
-    border:1.5px solid ${allActive ? 'var(--mode-accent)' : 'var(--border)'};
-    background:${allActive ? 'var(--mode-light)' : '#fff'};
-    color:${allActive ? 'var(--mode-accent)' : 'var(--text-muted)'};
-    font-weight:${allActive ? '600' : '400'};
-    display:flex;justify-content:space-between;align-items:center;gap:6px;
-  ">🌐 Todos<span style="font-size:10px;opacity:0.5">${baseRows.length}</span></button>`;
+    border:1.5px solid ${active ? 'var(--mode-accent)' : 'var(--border)'};
+    background:${active ? 'var(--mode-light)' : '#fff'};
+    color:${active ? 'var(--mode-accent)' : 'var(--text-muted)'};
+    font-weight:${active ? '600' : '400'};`;
 
+  const allBtn = `<button data-rval="ALL" style="${rStyle(allActive)}">🌐 Todos</button>`;
   const regBtns = opts.map(o => {
     const isActive = state.regiaoFilter.includes(o.val);
-    const count = countByRegiao[o.val] || 0;
-    if (count === 0 && !isActive) return ''; // hide regions with no results
-    return `<button data-rval="${o.val}" style="
-      text-align:left;padding:7px 10px;border-radius:6px;font-size:12px;cursor:pointer;
-      border:1.5px solid ${isActive ? 'var(--mode-accent)' : 'var(--border)'};
-      background:${isActive ? 'var(--mode-light)' : '#fff'};
-      color:${isActive ? 'var(--mode-accent)' : 'var(--text-muted)'};
-      font-weight:${isActive ? '600' : '400'};
-      display:flex;justify-content:space-between;align-items:center;gap:6px;
-    ">${o.label}<span style="font-size:10px;opacity:0.5;flex-shrink:0">${count}</span></button>`;
+    return `<button data-rval="${o.val}" style="${rStyle(isActive)}">${o.label}</button>`;
   }).join('');
 
   grid.innerHTML = allBtn + regBtns;
