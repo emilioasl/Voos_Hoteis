@@ -396,6 +396,9 @@ td { padding: 9px 13px; vertical-align: middle; }
           <button class="sticky-toggle-btn" id="stickyToggleBtn" onclick="toggleStickyHeader()">
             📌 Header Off
           </button>
+          <button id="mapTile_dark"  onclick="setMapTile('dark')"  class="sticky-toggle-btn active" style="background:var(--mode-accent);color:#fff;border-color:var(--mode-accent)">🌑 Darkmode</button>
+          <button id="mapTile_osm"   onclick="setMapTile('osm')"   class="sticky-toggle-btn">🗺️ OSM</button>
+          <button id="mapTile_gmaps" onclick="setMapTile('gmaps')" class="sticky-toggle-btn">🟢 GMaps</button>
         </div>
       </div>
     </main>
@@ -4395,6 +4398,35 @@ function maybeRenderMap() {
   }
 }
 
+
+function setMapTile(style) {
+  window._currentTile = style;
+  const urls = {
+    dark:  'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    osm:   'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    gmaps: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+  };
+  const attrs = {
+    dark:  '&copy; <a href="https://carto.com/">CARTO</a>',
+    osm:   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    gmaps: '&copy; <a href="https://carto.com/">CARTO</a>',
+  };
+  if (window._tileLayer && leafletMap) {
+    leafletMap.removeLayer(window._tileLayer);
+  }
+  window._tileLayer = L.tileLayer(urls[style], {
+    attribution: attrs[style], subdomains: 'abcd', maxZoom: 19,
+  }).addTo(leafletMap);
+  // Update button styles
+  ['dark','osm','gmaps'].forEach(s => {
+    const btn = document.getElementById('mapTile_' + s);
+    if (!btn) return;
+    btn.style.background = s === style ? 'var(--mode-accent)' : '';
+    btn.style.color = s === style ? '#fff' : '';
+    btn.style.borderColor = s === style ? 'var(--mode-accent)' : 'var(--border2)';
+  });
+}
+window.setMapTile = setMapTile;
 window.toggleView = toggleView;
 
 function getBestPriceByDest(rows) {
@@ -4545,8 +4577,19 @@ function renderMap() {
     leafletMap = L.map('mapView', {
       center: [15, 0], zoom: 2, minZoom: 1, maxZoom: 14,
     });
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
+    const _tileUrls = {
+      dark:  'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+      osm:   'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      gmaps: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+    };
+    const _tileAttr = {
+      dark:  '&copy; <a href="https://carto.com/">CARTO</a>',
+      osm:   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      gmaps: '&copy; <a href="https://carto.com/">CARTO</a>',
+    };
+    window._currentTile = window._currentTile || 'dark';
+    window._tileLayer = L.tileLayer(_tileUrls[window._currentTile], {
+      attribution: _tileAttr[window._currentTile],
       subdomains: 'abcd', maxZoom: 19,
     }).addTo(leafletMap);
   }
@@ -4609,6 +4652,35 @@ function renderMap() {
   setTimeout(() => { if (leafletMap) leafletMap.invalidateSize(); }, 80);
 }
 
+
+function setMapTile(style) {
+  window._currentTile = style;
+  const urls = {
+    dark:  'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    osm:   'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    gmaps: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+  };
+  const attrs = {
+    dark:  '&copy; <a href="https://carto.com/">CARTO</a>',
+    osm:   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    gmaps: '&copy; <a href="https://carto.com/">CARTO</a>',
+  };
+  if (window._tileLayer && leafletMap) {
+    leafletMap.removeLayer(window._tileLayer);
+  }
+  window._tileLayer = L.tileLayer(urls[style], {
+    attribution: attrs[style], subdomains: 'abcd', maxZoom: 19,
+  }).addTo(leafletMap);
+  // Update button styles
+  ['dark','osm','gmaps'].forEach(s => {
+    const btn = document.getElementById('mapTile_' + s);
+    if (!btn) return;
+    btn.style.background = s === style ? 'var(--mode-accent)' : '';
+    btn.style.color = s === style ? '#fff' : '';
+    btn.style.borderColor = s === style ? 'var(--mode-accent)' : 'var(--border2)';
+  });
+}
+window.setMapTile = setMapTile;
 window.toggleView = toggleView;
 </script>
 </body>
