@@ -4397,32 +4397,51 @@ let _dotMarkers   = [];   // dot markers (rebuilt on renderMap)
 let _priceMarkers = [];   // price labels (rebuilt on moveend/zoomend)
 let _mapListening = false;
 
+// Quartile color: Q1=green, Q2=yellow, Q3+Q4=red — relative to visible 50
+function _quartileColor(rank, total) {
+  const pct = rank / total;
+  if (pct <= 0.25) return '#00875a'; // Q1 — verde
+  if (pct <= 0.50) return '#f59e0b'; // Q2 — amarelo
+  return '#e85d04';                   // Q3+Q4 — vermelho
+}
+
 function _rebuildPriceLabels() {
   if (!leafletMap) return;
+
   // Remove old price labels
   _priceMarkers.forEach(m => m.remove());
   _priceMarkers = [];
 
   const zoom = leafletMap.getZoom();
-  if (zoom < MAP_PRICE_ZOOM_THRESHOLD) return; // dots only at low zoom
+  const showPrices = zoom >= MAP_PRICE_ZOOM_THRESHOLD;
+
+  // Show/hide dot markers based on zoom — dots only when prices are hidden
+  _dotMarkers.forEach(m => {
+    const el = m.getElement();
+    if (el) el.style.display = showPrices ? 'none' : '';
+  });
+
+  if (!showPrices) return;
 
   const bounds = leafletMap.getBounds();
-  const accentColor = state.mode === 'voos' ? '#00875a' : '#0052cc';
 
   // Filter points inside current viewport
   const inView = _mapPoints.filter(p => {
-    const [lat, lng] = IATA_COORDS[p.iata];
-    return bounds.contains([lat, lng]);
+    const coords = IATA_COORDS[p.iata];
+    return coords && bounds.contains(coords);
   });
 
   // Sort by price, take cheapest 50
   inView.sort((a, b) => a.price - b.price);
   const top50 = inView.slice(0, MAP_MAX_PRICE_LABELS);
+  const total  = top50.length;
 
-  top50.forEach(p => {
+  top50.forEach((p, rank) => {
     const [lat, lng] = IATA_COORDS[p.iata];
     const priceStr = `R$ ${fmtN(p.price)}`;
-    const icon = makePriceIcon(priceStr, accentColor);
+    const color    = _quartileColor(rank, total);
+
+    const icon = makePriceIcon(priceStr, color);
     const marker = L.marker([lat, lng], { icon, zIndexOffset: 1000 });
 
     const idaFmt   = p.ida   ? fmtDate(p.ida)   : '';
@@ -4432,7 +4451,7 @@ function _rebuildPriceLabels() {
 
     marker.bindPopup(`
       <div class="map-popup-city">${p.city}${p.country ? ` <span style="font-weight:400;color:#9ba3b5">(${p.country})</span>` : ''}</div>
-      <div class="map-popup-price">${priceStr}</div>
+      <div class="map-popup-price" style="color:${color}">${priceStr}</div>
       <div class="map-popup-detail">${idaFmt ? `✈️ ${idaFmt}${voltaFmt ? ` → ${voltaFmt}` : ''}` : ''}${diasStr ? ` · ${diasStr}` : ''}</div>
       ${linkBtn}
     `, { maxWidth: 220 });
