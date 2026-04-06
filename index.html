@@ -1956,11 +1956,11 @@ function renderDateFilter() {
   const isMobile = window.innerWidth <= 768;
   if (!section._initialized) {
     section._initialized = true;
-    section._open = !isMobile;
+    section._open = false; // sempre começa fechado
     const body = document.getElementById('dateFilterBody');
     const arrow = document.getElementById('dateArrow');
-    body.style.display = section._open ? '' : 'none';
-    if (arrow) arrow.classList.toggle('open', section._open);
+    body.style.display = 'none';
+    if (arrow) arrow.classList.remove('open');
   }
 
   // Month buttons
