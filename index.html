@@ -283,7 +283,7 @@ td { padding: 9px 13px; vertical-align: middle; }
         </div>
         <!-- TOGGLE: Ida e Volta / Apenas Ida / Todos (voos only) -->
         <div class="toggle-pill" id="idaVoltaToggle" style="margin-top:6px;display:none">
-          <button id="ivBtn_idavolta" onclick="setIdaVoltaToggle('idavolta')" class="active">Ida e Volta</button>
+          <button id="ivBtn_idavolta" onclick="setIdaVoltaToggle('idavolta')">Ida e Volta</button>
           <button id="ivBtn_ida"      onclick="setIdaVoltaToggle('ida')">Apenas Ida</button>
           <button id="ivBtn_ALL"      onclick="setIdaVoltaToggle('ALL')">Todos</button>
         </div>
@@ -1010,6 +1010,7 @@ function enterMode(mode) {
   document.getElementById('app').style.display = 'block';
   document.body.className = mode === 'voos' ? 'mode-voos' : '';
   updateHeader();
+  _updateToggleVisibility(); // sync toggles before data loads
   loadFromGitHub();
 }
 
