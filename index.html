@@ -1002,6 +1002,7 @@ function enterMode(mode) {
   state.diasFilter = 'ALL';
   state.idaVoltaFilter = 'idavolta';
   state.viewMode = 'list';
+  state.classFilter = mode === 'hoteis' ? 'ALL' : 'ECO';
   document.getElementById('landing').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   document.body.className = mode === 'voos' ? 'mode-voos' : '';
@@ -1021,7 +1022,7 @@ function switchMode() {
   state.idaVoltaFilter = 'idavolta';
   state.viewMode = 'list';
   state.selectedOrigin = 'ALL';
-  state.classFilter = 'ECO';
+  state.classFilter = m === 'hoteis' ? 'ALL' : 'ECO';
   // Reset mobile toggle button
   const btn = document.getElementById('viewToggleBtn');
   if (btn) { btn.textContent = '🗺️ Mapa'; btn.classList.remove('map-active'); }
@@ -1065,8 +1066,8 @@ async function loadFromGitHub() {
     let files = data.tree
       .filter(f => {
         if (f.type !== 'blob' || !f.path.includes(pat) || !f.path.endsWith('.csv')) return false;
-        // classFilter: ECO/EXE in filename (voos: _ECO_compilado / _EXE_compilado; hoteis: future)
-        if (state.classFilter !== 'ALL') {
+        // classFilter: ECO/EXE in filename — only applies to voos mode
+        if (state.mode === 'voos' && state.classFilter !== 'ALL') {
           const name = f.path.split('/').pop();
           if (!name.includes('_' + state.classFilter + '_')) return false;
         }
@@ -1100,6 +1101,16 @@ async function loadFromGitHub() {
       const dateTs = dateToTs(date);
       state.files.push({ name: f.name, date, dateTs, isLatest: f.isLatest, count: rows.length });
       rows.forEach(row => {
+        // For hoteis mode: compute Checkout_Date from Checkin_Date + # Days
+        if (state.mode === 'hoteis' && row['Checkin_Date'] && !row['Checkout_Date']) {
+          const days = parseInt(row['# Days'] || 0);
+          if (days > 0) {
+            const d = new Date(row['Checkin_Date'] + 'T12:00:00');
+            d.setDate(d.getDate() + days);
+            row['Checkout_Date'] = d.toISOString().substring(0, 10);
+          }
+          row['_dias'] = days || '';
+        }
         // Parse DATA_DE_IDA into separate ida/volta for voos mode
         if (state.mode === 'voos' && row['DATA_DE_IDA']) {
           const parsed = parseDateField(row['DATA_DE_IDA']);
@@ -1333,8 +1344,9 @@ function getFiltered() {
   if (state.selectedDest !== 'ALL') rows = rows.filter(r => r[key] === state.selectedDest);
 
   // Origin filter (voos only)
-  if (state.mode === 'voos' && state.selectedOrigin !== 'ALL') {
-    rows = rows.filter(r => (r.DE || '').trim().toUpperCase() === state.selectedOrigin);
+  if (state.selectedOrigin !== 'ALL') {
+    const oKey = state.mode === 'hoteis' ? 'City' : 'DE';
+    rows = rows.filter(r => (r[oKey] || '').trim().toUpperCase() === state.selectedOrigin);
   }
 
   // Dias filter (voos only)
@@ -1457,8 +1469,9 @@ function getAllFiltered(overrides = {}) {
   let rows = state.allRows;
   const key = state.mode === 'hoteis' ? 'City' : 'PARA';
   if (state.selectedDest !== 'ALL') rows = rows.filter(r => r[key] === state.selectedDest);
-  if (state.mode === 'voos' && state.selectedOrigin !== 'ALL') {
-    rows = rows.filter(r => (r.DE || '').trim().toUpperCase() === state.selectedOrigin);
+  if (state.selectedOrigin !== 'ALL') {
+    const oKey = state.mode === 'hoteis' ? 'City' : 'DE';
+    rows = rows.filter(r => (r[oKey] || '').trim().toUpperCase() === state.selectedOrigin);
   }
   if (state.diasFilter !== 'ALL') rows = rows.filter(r => String(r._dias) === state.diasFilter);
   if (state.search) {
@@ -1530,21 +1543,19 @@ function renderOriginFilter() {
   const section = document.getElementById('originFilterSection');
   if (!section) return;
 
-  // Only show in voos mode
-  if (state.mode !== 'voos') { section.style.display = 'none'; return; }
-
   // Collect unique origins from loaded data
+  const originKey = state.mode === 'hoteis' ? 'City' : 'DE';
   const origins = [...new Set(
     state.allRows
-      .map(r => (r.DE || '').trim().toUpperCase())
+      .map(r => (r[originKey] || '').trim().toUpperCase())
       .filter(v => v && v !== '-' && v !== 'UNKNOWN')
   )].sort();
 
   // Hide if only 1 origin
   if (origins.length <= 1) { section.style.display = 'none'; return; }
 
-  // Default to SAO if not yet set and SAO exists
-  if (state.selectedOrigin === 'ALL' && origins.includes('SAO')) {
+  // Default to SAO if not yet set and SAO exists (voos only)
+  if (state.mode === 'voos' && state.selectedOrigin === 'ALL' && origins.includes('SAO')) {
     state.selectedOrigin = 'SAO';
   }
 
@@ -1643,6 +1654,9 @@ function _updateToggleVisibility() {
   // idaVolta toggle — only in voos mode
   const ivt = document.getElementById('idaVoltaToggle');
   if (ivt) ivt.style.display = state.mode === 'voos' ? '' : 'none';
+  // ECO/EXE toggle — only in voos mode (hoteis don't have class filter)
+  const ct = document.getElementById('classToggle');
+  if (ct) ct.style.display = state.mode === 'voos' ? '' : 'none';
   // Sync class filter pills
   ['ECO','EXE'].forEach(v => {
     const btn = document.getElementById('classBtn_' + v);
