@@ -388,8 +388,8 @@ td { padding: 9px 13px; vertical-align: middle; }
           <button class="sticky-toggle-btn" id="stickyToggleBtn" onclick="toggleStickyHeader()">
             📌 Header Off
           </button>
-          <button id="mapTile_dark"  onclick="setMapTile('dark')"  class="sticky-toggle-btn active" style="background:var(--mode-accent);color:#fff;border-color:var(--mode-accent)">🌑 Darkmode</button>
-          <button id="mapTile_osm"   onclick="setMapTile('osm')"   class="sticky-toggle-btn">🗺️ OSM</button>
+          <button id="mapTile_dark"  onclick="setMapTile('dark')"  class="sticky-toggle-btn">🌑 Darkmode</button>
+          <button id="mapTile_osm"   onclick="setMapTile('osm')"   class="sticky-toggle-btn active" style="background:var(--mode-accent);color:#fff;border-color:var(--mode-accent)">🗺️ OSM</button>
           <button id="mapTile_gmaps" onclick="setMapTile('gmaps')" class="sticky-toggle-btn">🟢 GMaps</button>
         </div>
       </div>
@@ -986,7 +986,7 @@ function parseGoogleDate(raw) {
   };
 }
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 20;
 
 // Número → string formatada: 3000 → "3.000"
 function fmtN(val) {
@@ -1344,9 +1344,8 @@ function getFiltered() {
   if (state.selectedDest !== 'ALL') rows = rows.filter(r => r[key] === state.selectedDest);
 
   // Origin filter (voos only)
-  if (state.selectedOrigin !== 'ALL') {
-    const oKey = state.mode === 'hoteis' ? 'City' : 'DE';
-    rows = rows.filter(r => (r[oKey] || '').trim().toUpperCase() === state.selectedOrigin);
+  if (state.mode === 'voos' && state.selectedOrigin !== 'ALL') {
+    rows = rows.filter(r => (r.DE || '').trim().toUpperCase() === state.selectedOrigin);
   }
 
   // Dias filter (voos only)
@@ -1469,9 +1468,8 @@ function getAllFiltered(overrides = {}) {
   let rows = state.allRows;
   const key = state.mode === 'hoteis' ? 'City' : 'PARA';
   if (state.selectedDest !== 'ALL') rows = rows.filter(r => r[key] === state.selectedDest);
-  if (state.selectedOrigin !== 'ALL') {
-    const oKey = state.mode === 'hoteis' ? 'City' : 'DE';
-    rows = rows.filter(r => (r[oKey] || '').trim().toUpperCase() === state.selectedOrigin);
+  if (state.mode === 'voos' && state.selectedOrigin !== 'ALL') {
+    rows = rows.filter(r => (r.DE || '').trim().toUpperCase() === state.selectedOrigin);
   }
   if (state.diasFilter !== 'ALL') rows = rows.filter(r => String(r._dias) === state.diasFilter);
   if (state.search) {
@@ -1543,11 +1541,13 @@ function renderOriginFilter() {
   const section = document.getElementById('originFilterSection');
   if (!section) return;
 
+  // Only show in voos mode
+  if (state.mode !== 'voos') { section.style.display = 'none'; return; }
+
   // Collect unique origins from loaded data
-  const originKey = state.mode === 'hoteis' ? 'City' : 'DE';
   const origins = [...new Set(
     state.allRows
-      .map(r => (r[originKey] || '').trim().toUpperCase())
+      .map(r => (r.DE || '').trim().toUpperCase())
       .filter(v => v && v !== '-' && v !== 'UNKNOWN')
   )].sort();
 
@@ -4609,7 +4609,7 @@ function renderMap() {
       osm:   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
       gmaps: '&copy; <a href="https://carto.com/">CARTO</a>',
     };
-    window._currentTile = window._currentTile || 'dark';
+    window._currentTile = window._currentTile || 'osm';
     window._tileLayer = L.tileLayer(_tileUrls[window._currentTile], {
       attribution: _tileAttr[window._currentTile],
       subdomains: 'abcd', maxZoom: 19,
