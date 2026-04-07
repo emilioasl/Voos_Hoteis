@@ -875,7 +875,6 @@ const SEARCH_ALIASES = {
 
 // ── FERIADOS ──────────────────────────────────────────────────────────────
 const FERIADOS = [
-  { name: '🟡 Paixão/Páscoa (Sex)',  ranges: [{sd:2,sm:4,ed:5,em:4},{sd:3,sm:4,ed:5,em:4}] },
   { name: '🟡 Tiradentes (Ter)',     ranges: [{sd:17,sm:4,ed:21,em:4},{sd:18,sm:4,ed:21,em:4}] },
   { name: '🟡 Trabalho (Sex)',       ranges: [{sd:30,sm:4,ed:3,em:5},{sd:1,sm:5,ed:3,em:5}] },
   { name: '🟡 Corpus (Qui)',         ranges: [{sd:3,sm:6,ed:7,em:6},{sd:4,sm:6,ed:7,em:6}] },
@@ -910,7 +909,9 @@ function dateInFeriado(date, feriado) {
 const MONTH_MAP = {
   jan:1,jann:1, fev:2,fevv:2, mar:3,marr:3, abr:4,abrr:4, mai:5,maii:5,
   jun:6,junn:6, jul:7,jull:7, ago:8,agoo:8,
-  set:9,sett:9, out:10,outt:10, nov:11,novv:11, dez:12,dezz:12
+  set:9,sett:9, out:10,outt:10, nov:11,novv:11, dez:12,dezz:12,
+  // English abbreviations (new CSV format: "30-Apr", "03-May")
+  feb:2, apr:4, may:5, aug:8, sep:9, oct:10
 };
 
 // "02/abr/2026" or ISO "2026-04-02" → "02/abr/2026"
@@ -1104,7 +1105,8 @@ async function loadFromGitHub() {
           const parsed = parseDateField(row['DATA_DE_IDA']);
           // Save raw ISO strings for _dias calculation BEFORE any formatting
           const idaISO   = parsed.ida   || '';
-          const voltaISO = parsed.volta || row['VOLTA'] || '';
+          const rawVolta = row['VOLTA'] || '';
+          const voltaISO = parsed.volta || (rawVolta ? partToISO(rawVolta) : '') || '';
           row['DATA_DE_IDA'] = idaISO;
           row['DATA_VOLTA']  = voltaISO;
           // Compute _dias = difference in days between ida and volta
@@ -1231,6 +1233,20 @@ function partToISO(part, refYear) {
     let yr = parseInt(ddmmyy[3]);
     if (yr < 100) yr += 2000; // 27 → 2027
     return `${yr}-${mon}-${day}`;
+  }
+  // DD-Mmm format (new CSV format: "30-Apr", "03-May")
+  const ddMmm = part.match(/^(\d{1,2})-([A-Za-z]{2,4})$/);
+  if (ddMmm) {
+    const day = ddMmm[1].padStart(2, '0');
+    const mon = parseMonthAbbr(ddMmm[2]);
+    if (mon) {
+      if (refYear !== undefined) return `${refYear}-${mon}-${day}`;
+      const now = new Date();
+      let year = now.getFullYear();
+      const testDate = new Date(year, parseInt(mon)-1, parseInt(day));
+      if (testDate < now) year++;
+      return `${year}-${mon}-${day}`;
+    }
   }
   const monthKeys = Object.keys(MONTH_MAP).sort((a,b) => b.length - a.length);
   const monthPattern = monthKeys.join('|');
