@@ -4456,26 +4456,33 @@ function getBestPriceByDest(rows) {
   const cityKey    = state.mode === 'hoteis' ? 'City Name' : 'CIDADE';
   const countryKey = state.mode === 'hoteis' ? 'Country' : 'PAÍS';
 
-  const best = {};
+  const buckets = {}; // iata → array of rows sorted by price
   for (const r of rows) {
     const iata = (r[destKey] || '').trim().toUpperCase();
-    // Fix #3: also try matching by city name if IATA not found directly
     if (!iata) continue;
     const coords = IATA_COORDS[iata];
     if (!coords) continue;
     const price = parsePrice(r[priceKey]);
     if (!price) continue;
-    if (!best[iata] || price < best[iata].price) {
-      best[iata] = {
-        iata, price,
-        city: r[cityKey] || r[destKey] || iata,
-        country: r[countryKey] || '',
-        url: r.URL || r.url_flight || '',
-        ida: r['DATA_DE_IDA'] || r['Checkin_Date'] || '',
-        volta: r['DATA_VOLTA'] || r['Checkout_Date'] || '',
-        dias: r['_dias'] || r['# Days'] || '',
-      };
-    }
+    if (!buckets[iata]) buckets[iata] = [];
+    buckets[iata].push({
+      iata, price,
+      city: r[cityKey] || r[destKey] || iata,
+      country: r[countryKey] || '',
+      url: r.URL || r.url_flight || '',
+      urlHotel: r.URL || '',
+      urlVoo: r.url_flight || '',
+      hotelName: r['Hotel Name'] || '',
+      ida: r['DATA_DE_IDA'] || r['Checkin_Date'] || '',
+      volta: r['DATA_VOLTA'] || r['Checkout_Date'] || '',
+      dias: r['_dias'] || r['# Days'] || '',
+    });
+  }
+  // Build result: best = cheapest per dest, top5 = cheapest 5
+  const best = {};
+  for (const iata of Object.keys(buckets)) {
+    const sorted = buckets[iata].sort((a, b) => a.price - b.price);
+    best[iata] = { ...sorted[0], top5: sorted.slice(0, 5) };
   }
   return best;
 }
@@ -4516,6 +4523,31 @@ function makePriceIcon(priceStr, accentColor) {
     ">${priceStr}</div>`,
     iconAnchor: [0, 0],
   });
+}
+
+// Build hoteis popup content — top 5 hotels per destination
+function _buildHoteisPopup(p, color) {
+  const items = (p.top5 || [p]).map(h => {
+    const priceStr = `R$ ${fmtN(h.price)}`;
+    const idaFmt   = h.ida   ? fmtDate(h.ida)   : '';
+    const voltaFmt = h.volta && h.volta !== '-' ? fmtDate(h.volta) : '';
+    const diasStr  = h.dias  ? `${h.dias}d` : '';
+    const dateRow  = idaFmt ? `<div style="font-size:10px;color:#5a6072;margin:1px 0">✈️ ${idaFmt}${voltaFmt ? ` → ${voltaFmt}` : ''}${diasStr ? ` · ${diasStr}` : ''}</div>` : '';
+    const vooBtn   = h.urlVoo   ? `<a href="${h.urlVoo}"   target="_blank" rel="noopener" style="font-size:10px;padding:2px 7px;border-radius:4px;background:#e8f0ff;color:#0052cc;font-weight:600;text-decoration:none;white-space:nowrap">✈️ Voo</a>` : '';
+    const hotelBtn = h.urlHotel ? `<a href="${h.urlHotel}" target="_blank" rel="noopener" style="font-size:10px;padding:2px 7px;border-radius:4px;background:#fff3cd;color:#856404;font-weight:600;text-decoration:none;white-space:nowrap">🏨 Hotel</a>` : '';
+    return `<div style="border-top:1px solid #eee;padding:5px 0 2px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
+        <span style="font-size:12px;font-weight:700;color:${color}">${priceStr}</span>
+        <span style="font-size:10px;color:#5a6072;flex:1;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${h.hotelName || ''}</span>
+      </div>
+      ${dateRow}
+      <div style="display:flex;gap:4px;margin-top:3px">${vooBtn}${hotelBtn}</div>
+    </div>`;
+  }).join('');
+  return `<div style="min-width:220px;max-width:280px">
+    <div style="font-size:13px;font-weight:700;color:#1a1d27;margin-bottom:4px">${p.city}${p.country ? ` <span style="font-weight:400;color:#9ba3b5">(${p.country})</span>` : ''}</div>
+    ${items}
+  </div>`;
 }
 
 // Price labels layer — rebuilt on every zoom/pan
@@ -4576,12 +4608,13 @@ function _rebuildPriceLabels() {
     const diasStr  = p.dias  ? `${p.dias}d`     : '';
     const linkBtn  = p.url   ? `<a href="${p.url}" target="_blank" rel="noopener noreferrer" class="map-popup-link">✈️ Ver oferta</a>` : '';
 
-    marker.bindPopup(`
-      <div class="map-popup-city">${p.city}${p.country ? ` <span style="font-weight:400;color:#9ba3b5">(${p.country})</span>` : ''}</div>
-      <div class="map-popup-price" style="color:${color}">${priceStr}</div>
-      <div class="map-popup-detail">${idaFmt ? `✈️ ${idaFmt}${voltaFmt ? ` → ${voltaFmt}` : ''}` : ''}${diasStr ? ` · ${diasStr}` : ''}</div>
-      ${linkBtn}
-    `, { maxWidth: 220 });
+    const popupContent = state.mode === 'hoteis'
+      ? _buildHoteisPopup(p, color)
+      : `<div class="map-popup-city">${p.city}${p.country ? ` <span style="font-weight:400;color:#9ba3b5">(${p.country})</span>` : ''}</div>
+         <div class="map-popup-price" style="color:${color}">${priceStr}</div>
+         <div class="map-popup-detail">${idaFmt ? `✈️ ${idaFmt}${voltaFmt ? ` → ${voltaFmt}` : ''}` : ''}${diasStr ? ` · ${diasStr}` : ''}</div>
+         ${linkBtn}`;
+    marker.bindPopup(popupContent, { maxWidth: 300 });
 
     marker.addTo(leafletMap);
     _priceMarkers.push(marker);
@@ -4646,12 +4679,13 @@ function renderMap() {
     const diasStr  = p.dias  ? `${p.dias}d`     : '';
     const linkBtn  = p.url   ? `<a href="${p.url}" target="_blank" rel="noopener noreferrer" class="map-popup-link">✈️ Ver oferta</a>` : '';
 
-    dot.bindPopup(`
-      <div class="map-popup-city">${p.city}${p.country ? ` <span style="font-weight:400;color:#9ba3b5">(${p.country})</span>` : ''}</div>
-      <div class="map-popup-price">${priceStr}</div>
-      <div class="map-popup-detail">${idaFmt ? `✈️ ${idaFmt}${voltaFmt ? ` → ${voltaFmt}` : ''}` : ''}${diasStr ? ` · ${diasStr}` : ''}</div>
-      ${linkBtn}
-    `, { maxWidth: 220 });
+    const dotPopup = state.mode === 'hoteis'
+      ? _buildHoteisPopup(p, '#0052cc')
+      : `<div class="map-popup-city">${p.city}${p.country ? ` <span style="font-weight:400;color:#9ba3b5">(${p.country})</span>` : ''}</div>
+         <div class="map-popup-price">${priceStr}</div>
+         <div class="map-popup-detail">${idaFmt ? `✈️ ${idaFmt}${voltaFmt ? ` → ${voltaFmt}` : ''}` : ''}${diasStr ? ` · ${diasStr}` : ''}</div>
+         ${linkBtn}`;
+    dot.bindPopup(dotPopup, { maxWidth: 300 });
 
     dot.addTo(leafletMap);
     _dotMarkers.push(dot);
