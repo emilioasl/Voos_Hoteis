@@ -1747,8 +1747,7 @@ function renderFileList() {
 function renderDiasFilter() {
   const section = document.getElementById('diasFilterSection');
   if (!section) return;
-  // Only show for voos mode and when there are rows with _dias
-  if (state.mode !== 'voos') { section.style.display = 'none'; return; }
+  // Show for both voos and hoteis modes when there are rows with _dias
 
   // Get ALL currently filtered rows (ignoring dias filter) — not just current page
   // Sem getAllFiltered — usa allRows direto para pegar lista de dias disponíveis
