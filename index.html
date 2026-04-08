@@ -389,8 +389,8 @@ td { padding: 9px 13px; vertical-align: middle; }
             📌 Header Off
           </button>
           <button id="mapTile_dark"  onclick="setMapTile('dark')"  class="sticky-toggle-btn">🌑 Darkmode</button>
-          <button id="mapTile_osm"   onclick="setMapTile('osm')"   class="sticky-toggle-btn active" style="background:var(--mode-accent);color:#fff;border-color:var(--mode-accent)">🗺️ OSM</button>
-          <button id="mapTile_gmaps" onclick="setMapTile('gmaps')" class="sticky-toggle-btn">🟢 GMaps</button>
+          <button id="mapTile_osm"   onclick="setMapTile('osm')"   class="sticky-toggle-btn">🗺️ OSM</button>
+          <button id="mapTile_gmaps" onclick="setMapTile('gmaps')" class="sticky-toggle-btn active" style="background:var(--mode-accent);color:#fff;border-color:var(--mode-accent)">🟢 GMaps</button>
         </div>
       </div>
     </main>
@@ -4503,14 +4503,17 @@ function makeDotIcon(accentColor) {
 
 // Price label marker — só aparece com zoom suficiente
 function makePriceIcon(priceStr, accentColor) {
+  const isGmaps = (window._currentTile || 'gmaps') === 'gmaps';
+  const textColor = isGmaps ? '#000' : '#fff';
+  const borderColor = isGmaps ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.25)';
   return L.divIcon({
     className: '',
     html: `<div style="
-      background:${accentColor};color:#fff;
+      background:${accentColor};color:${textColor};
       font-family:'Space Mono',monospace;font-size:10px;font-weight:700;
       padding:2px 7px;border-radius:10px;white-space:nowrap;
-      box-shadow:0 2px 8px rgba(0,0,0,0.5);cursor:pointer;
-      border:1.5px solid rgba(255,255,255,0.25);
+      box-shadow:0 2px 8px rgba(0,0,0,0.3);cursor:pointer;
+      border:1.5px solid ${borderColor};
     ">${priceStr}</div>`,
     iconAnchor: [0, 0],
   });
@@ -4609,7 +4612,7 @@ function renderMap() {
       osm:   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
       gmaps: '&copy; <a href="https://carto.com/">CARTO</a>',
     };
-    window._currentTile = window._currentTile || 'osm';
+    window._currentTile = window._currentTile || 'gmaps';
     window._tileLayer = L.tileLayer(_tileUrls[window._currentTile], {
       attribution: _tileAttr[window._currentTile],
       subdomains: 'abcd', maxZoom: 19,
