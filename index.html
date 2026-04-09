@@ -1099,6 +1099,7 @@ async function loadFromGitHub() {
 
       const date = extractDate(f.name);
       const dateTs = dateToTs(date);
+      const isOW = f.name.includes('_OW_'); // One-way file: ignore VOLTA column
       state.files.push({ name: f.name, date, dateTs, isLatest: f.isLatest, count: rows.length });
       rows.forEach(row => {
         // For hoteis mode: compute Checkout_Date from Checkin_Date + # Days
@@ -1116,8 +1117,9 @@ async function loadFromGitHub() {
           const parsed = parseDateField(row['DATA_DE_IDA']);
           // Save raw ISO strings for _dias calculation BEFORE any formatting
           const idaISO   = parsed.ida   || '';
-          const rawVolta = row['VOLTA'] || '';
-          const voltaISO = parsed.volta || (rawVolta ? partToISO(rawVolta) : '') || '';
+          // For OW files, ignore the VOLTA column (it's just the search range, not a return flight)
+          const rawVolta = isOW ? '' : (row['VOLTA'] || '');
+          const voltaISO = isOW ? '' : (parsed.volta || (rawVolta ? partToISO(rawVolta) : '') || '');
           row['DATA_DE_IDA'] = idaISO;
           row['DATA_VOLTA']  = voltaISO;
           // Compute _dias = difference in days between ida and volta
