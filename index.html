@@ -411,7 +411,7 @@ const PATTERN_VOOS   = '_compilado_Voos.csv';
 const state = {
   mode: 'hoteis', files: [], allRows: [],
   selectedDest: 'ALL', sortCol: '', sortAsc: true, search: '',
-  selectedMonth: 'ALL', selectedDay: 'ALL', currentPage: 0,
+  selectedMonth: 'ALL', selectedDays: [], currentPage: 0,
   feriadoFilter: [],   // [] = todos; array de names selecionados
   regiaoFilter: [],    // [] = todos; array de vals selecionados
   diasFilter: 'ALL',   // 'ALL' | number of days as string
@@ -996,7 +996,7 @@ function fmtN(val) {
 // ── LANDING ────────────────────────────────────────────────────────────────
 function enterMode(mode) {
   state.mode = mode;
-  state.selectedMonth = 'ALL'; state.selectedDay = 'ALL'; state.currentPage = 0;
+  state.selectedMonth = 'ALL'; state.selectedDays = []; state.currentPage = 0;
   state.feriadoFilter = [];
   state.regiaoFilter = [];
   state.diasFilter = 'ALL';
@@ -1015,7 +1015,7 @@ function switchMode() {
   const m = state.mode === 'hoteis' ? 'voos' : 'hoteis';
   state.mode = m; state.files = []; state.allRows = [];
   state.selectedDest = 'ALL'; state.search = '';
-  state.selectedMonth = 'ALL'; state.selectedDay = 'ALL'; state.currentPage = 0;
+  state.selectedMonth = 'ALL'; state.selectedDays = []; state.currentPage = 0;
   state.feriadoFilter = [];
   state.regiaoFilter = [];
   state.diasFilter = 'ALL';
@@ -1431,8 +1431,8 @@ function getFiltered() {
       const d = getRowDate(r, dateKey);
       if (!d) return false;
       if (MESES[d.getMonth()] !== state.selectedMonth) return false;
-      if (state.selectedDay !== 'ALL') {
-        if (String(d.getDate()).padStart(2,'0') !== state.selectedDay) return false;
+      if (state.selectedDays.length > 0) {
+        if (!state.selectedDays.includes(String(d.getDate()).padStart(2,'0'))) return false;
       }
       return true;
     });
@@ -1455,7 +1455,7 @@ function getAllFiltered(overrides = {}) {
   const savedRegiao    = state.regiaoFilter;
   const savedFeriado   = state.feriadoFilter;
   const savedMonth     = state.selectedMonth;
-  const savedDay       = state.selectedDay;
+  const savedDay       = state.selectedDays;
   const savedPage      = state.currentPage;
 
   Object.assign(state, overrides);
@@ -1511,7 +1511,7 @@ function getAllFiltered(overrides = {}) {
   }
   if (state.selectedMonth !== 'ALL') {
     const dk = state.mode === 'hoteis' ? 'Checkin_Date' : 'DATA_DE_IDA';
-    rows = rows.filter(r => { const d=getRowDate(r,dk); if(!d)return false; if(MESES[d.getMonth()]!==state.selectedMonth)return false; if(state.selectedDay!=='ALL'&&String(d.getDate()).padStart(2,'0')!==state.selectedDay)return false; return true; });
+    rows = rows.filter(r => { const d=getRowDate(r,dk); if(!d)return false; if(MESES[d.getMonth()]!==state.selectedMonth)return false; if(state.selectedDays.length>0&&!state.selectedDays.includes(String(d.getDate()).padStart(2,'0')))return false; return true; });
   }
 
   // restore
@@ -1520,7 +1520,7 @@ function getAllFiltered(overrides = {}) {
   state.regiaoFilter   = savedRegiao;
   state.feriadoFilter  = savedFeriado;
   state.selectedMonth  = savedMonth;
-  state.selectedDay    = savedDay;
+  state.selectedDays   = savedDay;
   state.currentPage    = savedPage;
 
   return rows;
@@ -1614,7 +1614,7 @@ function resetAllFilters() {
   state.selectedDest    = 'ALL';
   state.search          = '';
   state.selectedMonth   = 'ALL';
-  state.selectedDay     = 'ALL';
+  state.selectedDays    = [];
   state.currentPage     = 0;
   state.feriadoFilter   = [];
   state.regiaoFilter    = [];
@@ -2024,7 +2024,7 @@ function getRowDate(row, key) {
 function getAvailableMonths() {
   const dateKey = state.mode === 'hoteis' ? 'Checkin_Date' : 'DATA_DE_IDA';
   // Use all filtered rows (ignoring month/day filter) so months react to other filters
-  const rows = getAllFiltered({ selectedMonth: 'ALL', selectedDay: 'ALL' });
+  const rows = getAllFiltered({ selectedMonth: 'ALL', selectedDays: [] });
   const months = new Set();
   for (const row of rows) {
     const d = getRowDate(row, dateKey);
@@ -2041,7 +2041,7 @@ function getAvailableMonths() {
 function getAvailableDays(month) {
   const dateKey = state.mode === 'hoteis' ? 'Checkin_Date' : 'DATA_DE_IDA';
   // Use filtered rows (ignoring day filter) so days react to other filters + selected month
-  const rows = getAllFiltered({ selectedDay: 'ALL' });
+  const rows = getAllFiltered({ selectedDays: [] });
   const days = new Set();
   for (const row of rows) {
     const d = getRowDate(row, dateKey);
@@ -2088,21 +2088,30 @@ function renderDateFilter() {
     const days = getAvailableDays(selMonYear);
     dg.style.display = days.length ? '' : 'none';
     dbg.innerHTML =
-      `<button class="city-btn all-btn ${state.selectedDay==='ALL'?'active':''}" onclick="selectDay('ALL')">TODOS</button>` +
-      days.map(d => `<button class="city-btn ${state.selectedDay===d?'active':''}" onclick="selectDay('${d}')">${d}</button>`).join('');
+      `<button class="city-btn all-btn ${state.selectedDays.length===0?'active':''}" onclick="selectDay('ALL')">TODOS</button>` +
+      days.map(d => `<button class="city-btn ${state.selectedDays.includes(d)?'active':''}" onclick="selectDay('${d}')">${d}</button>`).join('');
   }
 }
 
 function selectMonth(mon) {
   state.selectedMonth = mon;
-  state.selectedDay = 'ALL';
+  state.selectedDays = [];
   state.currentPage = 0;
   _invalidateCountCache();
   debouncedRender();
 }
 
 function selectDay(day) {
-  state.selectedDay = day;
+  if (day === 'ALL') {
+    state.selectedDays = [];
+  } else {
+    const idx = state.selectedDays.indexOf(day);
+    if (idx === -1) {
+      state.selectedDays = [...state.selectedDays, day];
+    } else {
+      state.selectedDays = state.selectedDays.filter(d => d !== day);
+    }
+  }
   state.currentPage = 0;
   _invalidateCountCache();
   debouncedRender();
