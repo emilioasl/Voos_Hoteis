@@ -1066,6 +1066,7 @@ async function loadFromGitHub() {
     let files = data.tree
       .filter(f => {
         if (f.type !== 'blob' || !f.path.includes(pat) || !f.path.endsWith('.csv')) return false;
+        if (f.path.includes('/')) return false; // ignora subpastas (ex: Backup/)
         // classFilter: ECO/EXE in filename — only applies to voos mode
         if (state.mode === 'voos' && state.classFilter !== 'ALL') {
           const name = f.path.split('/').pop();
@@ -1247,7 +1248,16 @@ function partToISO(part, refYear) {
     if (yr < 100) yr += 2000; // 27 → 2027
     return `${yr}-${mon}-${day}`;
   }
-  // DD-Mmm format (new CSV format: "30-Apr", "03-May")
+  // DD-Mmm-YY format (V19+: "22-May-26", "03-Jan-27") — year explicit, trust it
+  const ddMmmYY = part.match(/^(\d{1,2})-([A-Za-z]{2,4})-(\d{2,4})$/);
+  if (ddMmmYY) {
+    const day = ddMmmYY[1].padStart(2, '0');
+    const mon = parseMonthAbbr(ddMmmYY[2]);
+    let yr = parseInt(ddMmmYY[3]);
+    if (yr < 100) yr += 2000; // 26 → 2026, 27 → 2027
+    if (mon) return `${yr}-${mon}-${day}`;
+  }
+  // DD-Mmm format (legacy, no year: "30-Apr", "03-May") — infer year from current month
   const ddMmm = part.match(/^(\d{1,2})-([A-Za-z]{2,4})$/);
   if (ddMmm) {
     const day = ddMmm[1].padStart(2, '0');
@@ -1255,9 +1265,9 @@ function partToISO(part, refYear) {
     if (mon) {
       if (refYear !== undefined) return `${refYear}-${mon}-${day}`;
       const now = new Date();
+      const curMonth = now.getMonth() + 1; // 1-12
       let year = now.getFullYear();
-      const testDate = new Date(year, parseInt(mon)-1, parseInt(day));
-      if (testDate < now) year++;
+      if (parseInt(mon) < curMonth) year++; // month already passed → next year
       return `${year}-${mon}-${day}`;
     }
   }
