@@ -875,18 +875,18 @@ const SEARCH_ALIASES = {
 
 // ── FERIADOS ──────────────────────────────────────────────────────────────
 const FERIADOS = [
-  { name: '🟡 Abril (17-21) Tiradentes (Ter)',      ranges: [{sd:17,sm:4,ed:21,em:4},{sd:18,sm:4,ed:21,em:4}] },
-  { name: '🟡 Abril (30-3) Trabalho (Sex)',          ranges: [{sd:30,sm:4,ed:3,em:5},{sd:1,sm:5,ed:3,em:5}] },
-  { name: '🟡 Junho (3-7) Corpus C (Qui)',           ranges: [{sd:3,sm:6,ed:7,em:6},{sd:4,sm:6,ed:7,em:6}] },
-  { name: '🟡 Setembro (4-7) Indep. (Seg)',          ranges: [{sd:4,sm:9,ed:7,em:9},{sd:5,sm:9,ed:7,em:9}] },
-  { name: '🟡 Outubro (9-12) Aparecida (Seg)',       ranges: [{sd:9,sm:10,ed:12,em:10},{sd:10,sm:10,ed:12,em:10}] },
-  { name: '🟡 Outubro (30-2) Finados (Seg)',         ranges: [{sd:30,sm:10,ed:2,em:11},{sd:31,sm:10,ed:2,em:11}] },
-  { name: '🟡 Novembro (19-22) Negros (Sex)',        ranges: [{sd:19,sm:11,ed:22,em:11},{sd:20,sm:11,ed:22,em:11}] },
+  { name: '🟡 Abril (17-21) Tiradentes (Ter)',     ranges: [{sd:17,sm:4,ed:21,em:4},{sd:18,sm:4,ed:21,em:4}] },
+  { name: '🟡 Abril (30-3) Trabalho (Sex)',       ranges: [{sd:30,sm:4,ed:3,em:5},{sd:1,sm:5,ed:3,em:5}] },
+  { name: '🟡 Junho (3-7) Corpus C (Qui)',         ranges: [{sd:3,sm:6,ed:7,em:6},{sd:4,sm:6,ed:7,em:6}] },
+  { name: '🟡 Setembro (4-7) Indep. (Seg)',  ranges: [{sd:4,sm:9,ed:7,em:9},{sd:5,sm:9,ed:7,em:9}] },
+  { name: '🟡 Outubro (9-12) Aparecida (Seg)',      ranges: [{sd:9,sm:10,ed:12,em:10},{sd:10,sm:10,ed:12,em:10}] },
+  { name: '🟡 Outubro (30-2) Finados (Seg)',        ranges: [{sd:30,sm:10,ed:2,em:11},{sd:31,sm:10,ed:2,em:11}] },
+  { name: '🟡 Novembro (19-22) Negros (Sex)',         ranges: [{sd:19,sm:11,ed:22,em:11},{sd:20,sm:11,ed:22,em:11}] },
   { name: '🟡 Julho (8-12) 9 Julho (Qui)',           ranges: [{sd:8,sm:7,ed:12,em:11},{sd:9,sm:7,ed:12,em:11}] },
-  { name: '🎄 Dezembro Natal/Ano Novo',               ranges: [{sd:18,sm:12,ed:3,em:1},{sd:19,sm:12,ed:3,em:1},{sd:20,sm:12,ed:3,em:1}] },
-  { name: '🎂 2027 Janeiro (22-25) Niver SP (Sex)',  ranges: [{sd:20,sm:12,ed:3,em:1},{sd:22,sm:1,ed:25,em:1}] },
-  { name: '🎭 2027 Fevereiro (5-14) Carna Inteiro',  voltaMin:{d:11,m:2}, ranges: [{sd:5,sm:2,ed:14,em:2},{sd:6,sm:2,ed:14,em:2},{sd:7,sm:2,ed:14,em:2}] },
-  { name: '🎭 2027 Fevereiro (5-10) Carna Metade',   voltaMax:{d:10,m:2}, ranges: [{sd:5,sm:2,ed:10,em:2},{sd:6,sm:2,ed:10,em:2}] },
+  { name: '🎄 Dezembro Natal/Ano Novo',       ranges: [{sd:18,sm:12,ed:3,em:1},{sd:19,sm:12,ed:3,em:1},{sd:20,sm:12,ed:3,em:1}] },
+  { name: '🎂 2027 Janeiro (22-25) Niver SP (Sex)',      ranges: [{sd:20,sm:12,ed:3,em:1},{sd:22,sm:1,ed:25,em:1}] },
+  { name: '🎭 2027 Fevereiro (5-14) Carna Inteiro',    voltaMin:{d:11,m:2}, ranges: [{sd:5,sm:2,ed:14,em:2},{sd:6,sm:2,ed:14,em:2},{sd:7,sm:2,ed:14,em:2}] },
+  { name: '🎭 2027 Fevereiro (5-10) Carna Metade', voltaMax:{d:10,m:2}, ranges: [{sd:5,sm:2,ed:10,em:2},{sd:6,sm:2,ed:10,em:2}] },
 ];
 
 function midnightOf(d) {
@@ -1066,7 +1066,6 @@ async function loadFromGitHub() {
     let files = data.tree
       .filter(f => {
         if (f.type !== 'blob' || !f.path.includes(pat) || !f.path.endsWith('.csv')) return false;
-        if (f.path.includes('/')) return false; // ignora subpastas (ex: Backup/)
         // classFilter: ECO/EXE in filename — only applies to voos mode
         if (state.mode === 'voos' && state.classFilter !== 'ALL') {
           const name = f.path.split('/').pop();
@@ -1115,20 +1114,27 @@ async function loadFromGitHub() {
         }
         // Parse DATA_DE_IDA into separate ida/volta for voos mode
         if (state.mode === 'voos' && row['DATA_DE_IDA']) {
-          // V19: DATA_DE_IDA e VOLTA são colunas separadas ("17-Apr-26"), usar partToISO direto
-          const idaISO   = partToISO(row['DATA_DE_IDA'] || '');
+          // V19 CSV: DATA_DE_IDA e VOLTA já vêm em colunas separadas (ex: "17-Apr-26", "03-Jan-27")
+          // Usar partToISO direto — não parseDateField (que espera formato combinado "17abr21abr")
+          const idaISO = partToISO(row['DATA_DE_IDA'] || '');
+          // Para VOLTA: inferir ano da ida se necessário (ex: Dez→Jan cruza o ano)
           const rawVolta = isOW ? '' : (row['VOLTA'] || '');
           let voltaISO = '';
           if (!isOW && rawVolta) {
-            const vParsed = partToISO(rawVolta);
-            if (/^\d{1,2}-[A-Za-z]{2,4}-\d{2,4}$/.test(rawVolta)) {
-              voltaISO = vParsed; // ano explícito no formato DD-Mmm-YY — confiar
-            } else {
-              const idaYear = idaISO ? parseInt(idaISO.split('-')[0]) : new Date().getFullYear();
-              const idaMon  = idaISO ? parseInt(idaISO.split('-')[1]) : 1;
-              const vMon    = vParsed ? parseInt(vParsed.split('-')[1]) : 0;
-              const voltaYear = (vMon > 0 && vMon < idaMon) ? idaYear + 1 : idaYear;
-              voltaISO = partToISO(rawVolta, voltaYear);
+            const idaYear  = idaISO ? parseInt(idaISO.split('-')[0]) : new Date().getFullYear();
+            const idaMon   = idaISO ? parseInt(idaISO.split('-')[1]) : 1;
+            const vParsed  = partToISO(rawVolta);
+            if (vParsed && vParsed.length >= 7) {
+              const vMon = parseInt(vParsed.split('-')[1]);
+              const vYr  = parseInt(vParsed.split('-')[0]);
+              // Se o ano já veio explícito no formato DD-Mmm-YY, confiar nele
+              // Se não (formato legado DD-Mmm), ajustar ano se volta cruzar o ano
+              if (/^\d{1,2}-[A-Za-z]{2,4}-\d{2,4}$/.test(rawVolta)) {
+                voltaISO = vParsed; // ano explícito — confiar
+              } else {
+                const voltaYear = (vMon < idaMon) ? idaYear + 1 : idaYear;
+                voltaISO = partToISO(rawVolta, voltaYear);
+              }
             }
           }
           row['DATA_DE_IDA'] = idaISO;
@@ -1264,7 +1270,7 @@ function partToISO(part, refYear) {
     const day = ddMmmYY[1].padStart(2, '0');
     const mon = parseMonthAbbr(ddMmmYY[2]);
     let yr = parseInt(ddMmmYY[3]);
-    if (yr < 100) yr += 2000;
+    if (yr < 100) yr += 2000; // 26→2026, 27→2027
     if (mon) return `${yr}-${mon}-${day}`;
   }
   // DD-Mmm format (legado sem ano: "30-Apr", "03-May") — inferir ano pelo mês atual
