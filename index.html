@@ -266,6 +266,17 @@ td { padding: 9px 13px; vertical-align: middle; }
       <div class="sidebar-section" id="originFilterSection" style="display:none">
         <div class="sidebar-label">✈️ Cidade Origem</div>
         <div id="originGrid" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px"></div>
+        <!-- TOGGLE: Econômico / Executivo -->
+        <div class="toggle-pill" id="classToggle" style="margin-top:10px">
+          <button id="classBtn_ECO" onclick="setClassFilter('ECO')" class="active">Econômico</button>
+          <button id="classBtn_EXE" onclick="setClassFilter('EXE')">Executivo</button>
+        </div>
+        <!-- TOGGLE: Ida e Volta / Apenas Ida / Todos (voos only) -->
+        <div class="toggle-pill" id="idaVoltaToggle" style="margin-top:6px;display:none">
+          <button id="ivBtn_idavolta" onclick="setIdaVoltaToggle('idavolta')">Ida e Volta</button>
+          <button id="ivBtn_ida"      onclick="setIdaVoltaToggle('ida')">Apenas Ida</button>
+          <button id="ivBtn_ALL"      onclick="setIdaVoltaToggle('ALL')">Todos</button>
+        </div>
       </div>
 
       <!-- 2. FERIADOS -->
@@ -324,17 +335,6 @@ td { padding: 9px 13px; vertical-align: middle; }
           <span class="si">🔍</span>
           <input type="text" id="searchInput" placeholder="país, cidade, aeroporto...">
         </div>
-        <!-- TOGGLE: Econômico / Executivo -->
-        <div class="toggle-pill" id="classToggle" style="margin-top:10px">
-          <button id="classBtn_ECO" onclick="setClassFilter('ECO')" class="active">Econômico</button>
-          <button id="classBtn_EXE" onclick="setClassFilter('EXE')">Executivo</button>
-        </div>
-        <!-- TOGGLE: Ida e Volta / Apenas Ida / Todos (voos only) -->
-        <div class="toggle-pill" id="idaVoltaToggle" style="margin-top:6px;display:none">
-          <button id="ivBtn_idavolta" onclick="setIdaVoltaToggle('idavolta')">Ida e Volta</button>
-          <button id="ivBtn_ida"      onclick="setIdaVoltaToggle('ida')">Apenas Ida</button>
-          <button id="ivBtn_ALL"      onclick="setIdaVoltaToggle('ALL')">Todos</button>
-        </div>
       </div>
 
     </aside>
@@ -352,6 +352,9 @@ td { padding: 9px 13px; vertical-align: middle; }
           <div class="result-count" id="resultCount"></div>
         </div>
         <div id="contentRow">
+          <div id="mapCol">
+            <div id="mapView"></div>
+          </div>
           <div id="listCol">
             <div class="table-wrap" id="tableWrapEl">
               <table>
@@ -360,9 +363,6 @@ td { padding: 9px 13px; vertical-align: middle; }
               </table>
             </div>
             <!-- paginationBar injected here by JS -->
-          </div>
-          <div id="mapCol">
-            <div id="mapView"></div>
           </div>
         </div>
         <!-- statsBar — arquivos/registros/destinos -->
@@ -4458,8 +4458,8 @@ function hideDesktopMap() {
 
 function maybeRenderMap() {
   if (isMobileView()) {
-    // Mobile: only render if user explicitly switched to map view
-    if (state.viewMode === 'map') renderMap();
+    // Mobile: mapa sempre visível — renderizar sempre
+    renderMap();
   } else {
     // Desktop: render if mapCol is visible
     const mapCol = document.getElementById('mapCol');
