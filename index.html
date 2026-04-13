@@ -85,7 +85,7 @@ header { border-bottom: 1px solid var(--border); padding: 14px 28px; display: fl
 .sticky-toggle-btn.active { background: var(--mode-accent); border-color: var(--mode-accent); color: #fff; }
 #status-bar { font-family: var(--mono); font-size: 11px; color: var(--text-dim); }
 #status-bar b { color: var(--mode-accent); }
-#status-bar-mobile { display: none; font-family: var(--mono); font-size: 11px; color: var(--text-dim); padding: 10px 14px; border-bottom: 1px solid var(--border); background: var(--surface); }
+#status-bar-mobile { display: none; font-family: var(--mono); font-size: 11px; color: var(--text-dim); padding: 0;  background: var(--surface); }
 #status-bar-mobile b { color: var(--mode-accent); }
 
 /* LAYOUT */
@@ -162,7 +162,7 @@ main { padding: 22px 26px; overflow-x: hidden; }
 .map-popup-detail { font-size:11px; color:#5a6072; margin-top:4px; }
 .map-popup-link { display:inline-block; margin-top:8px; padding:4px 10px; border-radius:5px; background:var(--accent-v,#00875a); color:#fff; font-size:11px; font-weight:600; text-decoration:none; }
 /* TABLE */
-.table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
+.table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.04); width: 95%; margin: 0 auto; }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
 thead { background: var(--surface); }
 thead th { padding: 10px 13px; text-align: left; font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; color: var(--text-muted); border-bottom: 2px solid var(--border2); white-space: nowrap; text-transform: uppercase; cursor: pointer; user-select: none; }
@@ -206,7 +206,7 @@ td { padding: 9px 13px; vertical-align: middle; }
   .layout { grid-template-columns: 1fr; display: flex; flex-direction: column; }
   aside { position: static; height: auto; border-right: none; border-bottom: 1px solid var(--border); order: 0; display: flex; flex-direction: column; }
   aside #filesSection { order: 99; border-top: 1px solid var(--border); margin-top: 0; }
-  main { padding: 14px; order: 1; }
+  main { padding: 0; order: 1; }
   #filesSection { border-bottom: 1px solid var(--border); }
   #status-bar { display: none; }
   #status-bar-mobile { display: block; }
@@ -348,7 +348,7 @@ td { padding: 9px 13px; vertical-align: middle; }
       </div>
       <div id="status-bar-mobile"></div>
       <div id="dataSection" style="display:none">
-        <div id="contentRow">
+        <div id="contentRow" style="padding-top:8px">
           <div id="mapCol">
             <div id="mapView"></div>
           </div>
