@@ -1139,6 +1139,15 @@ async function loadFromGitHub() {
           }
           row['DATA_DE_IDA'] = idaISO;
           row['DATA_VOLTA']  = voltaISO;
+
+          // LATAM x2: trip=RT (ida+volta) → preço é por trecho, multiplicar x2
+          // trip=OW (só ida, VOLTA="Unknown") → manter preço original
+          const _url = (row['URL'] || '');
+          if (_url.includes('latamairlines.com') && _url.includes('trip=RT')) {
+            const _precoNum = parseFloat((row['PREÇO'] || '0').toString().replace(/[^0-9.]/g, ''));
+            if (_precoNum > 0) row['PREÇO'] = String(Math.round(_precoNum * 2));
+          }
+
           // Compute _dias = difference in days between ida and volta
           if (idaISO && voltaISO && idaISO !== '-' && voltaISO !== '-') {
             const d1 = new Date(idaISO.substring(0,10) + 'T12:00:00');
