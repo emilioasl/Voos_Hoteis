@@ -211,13 +211,13 @@ td { padding: 9px 13px; vertical-align: middle; }
   #status-bar { display: none; }
   #status-bar-mobile { display: block; }
   body.sticky-header .table-wrap { max-height: calc(100vh - 160px); }
-  /* Mobile: toggle button shows, split hidden */
-  .view-toggle-btn { display:flex !important; }
+  /* Mobile: mapa sempre visível, sem botão toggle */
+  .view-toggle-btn { display:none !important; }
   #contentRow { display:block; }
-  #mapCol { position:static; display:none !important; }
-  #mapCol #mapView { display:none !important; height:calc(100vh - 160px); }
+  #mapCol { position:static; display:block !important; width:90%; margin:0 auto; }
+  #mapCol #mapView { display:block !important; height:calc((100vh - 160px) * 0.7); }
   #mapCol.mobile-map-visible { display:block !important; }
-  #mapCol.mobile-map-visible #mapView { display:block !important; }
+  #mapCol.mobile-map-visible #mapView { display:block !important; height:calc((100vh - 160px) * 0.7); }
   #listCol .table-wrap { display:block; }
   #listCol .table-wrap.mobile-hidden { display:none; }
 }
@@ -228,7 +228,6 @@ td { padding: 9px 13px; vertical-align: middle; }
 <!-- LANDING -->
 <div id="landing">
   <div class="landing-logo">✦ Buscador de Viagens do @EmilioASL</div>
-  <div class="landing-title">O que você quer ver?</div>
   <div class="landing-sub">Escolha o tipo de busca para continuar</div>
   <div class="landing-cards">
     <div class="landing-card voos-h" onclick="enterMode('hoteis')">
@@ -269,26 +268,6 @@ td { padding: 9px 13px; vertical-align: middle; }
         <div id="originGrid" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px"></div>
       </div>
 
-      <!-- 1. BUSCA RÁPIDA -->
-      <div class="sidebar-section">
-        <div class="sidebar-label">Busca rápida</div>
-        <div class="search-wrap">
-          <span class="si">🔍</span>
-          <input type="text" id="searchInput" placeholder="país, cidade, aeroporto...">
-        </div>
-        <!-- TOGGLE: Econômico / Executivo -->
-        <div class="toggle-pill" id="classToggle" style="margin-top:10px">
-          <button id="classBtn_ECO" onclick="setClassFilter('ECO')" class="active">Econômico</button>
-          <button id="classBtn_EXE" onclick="setClassFilter('EXE')">Executivo</button>
-        </div>
-        <!-- TOGGLE: Ida e Volta / Apenas Ida / Todos (voos only) -->
-        <div class="toggle-pill" id="idaVoltaToggle" style="margin-top:6px;display:none">
-          <button id="ivBtn_idavolta" onclick="setIdaVoltaToggle('idavolta')">Ida e Volta</button>
-          <button id="ivBtn_ida"      onclick="setIdaVoltaToggle('ida')">Apenas Ida</button>
-          <button id="ivBtn_ALL"      onclick="setIdaVoltaToggle('ALL')">Todos</button>
-        </div>
-      </div>
-
       <!-- 2. FERIADOS -->
       <div class="sidebar-section" id="feriadosSection">
         <div class="collapse-header" onclick="toggleFeriados()">
@@ -317,7 +296,7 @@ td { padding: 9px 13px; vertical-align: middle; }
       <!-- 3. FILTRAR DATA -->
       <div class="sidebar-section" id="dateSection" style="display:none">
         <div class="collapse-header" onclick="toggleDate()">
-          <div class="sidebar-label" id="dateLabel">Filtrar data - opcional</div>
+          <div class="sidebar-label" id="dateLabel">Data de Ida - opcional</div>
           <span class="collapse-arrow" id="dateArrow">▼</span>
         </div>
         <div id="dateFilterBody" style="margin-top:10px;display:none">
@@ -337,6 +316,24 @@ td { padding: 9px 13px; vertical-align: middle; }
         </div>
         <div id="diasFilterBody" style="display:none">
           <div class="city-grid" id="diasFilterGrid"></div>
+        </div>
+      <!-- BUSCA RÁPIDA -->
+      <div class="sidebar-section">
+        <div class="sidebar-label">Busca rápida</div>
+        <div class="search-wrap">
+          <span class="si">🔍</span>
+          <input type="text" id="searchInput" placeholder="país, cidade, aeroporto...">
+        </div>
+        <!-- TOGGLE: Econômico / Executivo -->
+        <div class="toggle-pill" id="classToggle" style="margin-top:10px">
+          <button id="classBtn_ECO" onclick="setClassFilter('ECO')" class="active">Econômico</button>
+          <button id="classBtn_EXE" onclick="setClassFilter('EXE')">Executivo</button>
+        </div>
+        <!-- TOGGLE: Ida e Volta / Apenas Ida / Todos (voos only) -->
+        <div class="toggle-pill" id="idaVoltaToggle" style="margin-top:6px;display:none">
+          <button id="ivBtn_idavolta" onclick="setIdaVoltaToggle('idavolta')">Ida e Volta</button>
+          <button id="ivBtn_ida"      onclick="setIdaVoltaToggle('ida')">Apenas Ida</button>
+          <button id="ivBtn_ALL"      onclick="setIdaVoltaToggle('ALL')">Todos</button>
         </div>
       </div>
 
@@ -414,7 +411,7 @@ const state = {
   selectedMonth: 'ALL', selectedDays: [], currentPage: 0,
   feriadoFilter: [],   // [] = todos; array de names selecionados
   regiaoFilter: [],    // [] = todos; array de vals selecionados
-  diasFilter: 'ALL',   // 'ALL' | number of days as string
+  diasFilter: [],      // [] = todos; array multi-select
   idaVoltaFilter: 'idavolta', // 'idavolta' | 'ida' | 'ALL'
   viewMode: 'list',      // 'list' | 'map'
   selectedOrigin: 'ALL', // 'ALL' | código IATA da origem (SAO, FLN, GIG...)
@@ -999,7 +996,7 @@ function enterMode(mode) {
   state.selectedMonth = 'ALL'; state.selectedDays = []; state.currentPage = 0;
   state.feriadoFilter = [];
   state.regiaoFilter = [];
-  state.diasFilter = 'ALL';
+  state.diasFilter = [];
   state.idaVoltaFilter = 'idavolta';
   state.viewMode = 'list';
   state.classFilter = mode === 'hoteis' ? 'ALL' : 'ECO';
@@ -1018,7 +1015,7 @@ function switchMode() {
   state.selectedMonth = 'ALL'; state.selectedDays = []; state.currentPage = 0;
   state.feriadoFilter = [];
   state.regiaoFilter = [];
-  state.diasFilter = 'ALL';
+  state.diasFilter = [];
   state.idaVoltaFilter = 'idavolta';
   state.viewMode = 'list';
   state.selectedOrigin = 'ALL';
@@ -1386,8 +1383,8 @@ function getFiltered() {
   }
 
   // Dias filter (voos only)
-  if (state.diasFilter !== 'ALL') {
-    rows = rows.filter(r => String(r._dias) === state.diasFilter);
+  if (state.diasFilter.length > 0) {
+    rows = rows.filter(r => state.diasFilter.includes(String(r._dias)));
   }
 
   if (state.search) {
@@ -1508,7 +1505,7 @@ function getAllFiltered(overrides = {}) {
   if (state.mode === 'voos' && state.selectedOrigin !== 'ALL') {
     rows = rows.filter(r => (r.DE || '').trim().toUpperCase() === state.selectedOrigin);
   }
-  if (state.diasFilter !== 'ALL') rows = rows.filter(r => String(r._dias) === state.diasFilter);
+  if (state.diasFilter.length > 0) rows = rows.filter(r => state.diasFilter.includes(String(r._dias)));
   if (state.search) {
     const norm = s => (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     const q = norm(state.search);
@@ -1609,7 +1606,7 @@ function renderOriginFilter() {
     border:1.5px solid ${allActive?accentColor:'var(--border)'};
     background:${allActive?accentLight:'#fff'};
     color:${allActive?accentColor:'var(--text-muted)'};
-  ">🌐 Todas</button>`;
+  ">Todas</button>`;
 
   origins.forEach(orig => {
     const isActive = state.selectedOrigin === orig;
@@ -1618,7 +1615,7 @@ function renderOriginFilter() {
       border:1.5px solid ${isActive?accentColor:'var(--border)'};
       background:${isActive?accentLight:'#fff'};
       color:${isActive?accentColor:'var(--text-muted)'};
-    ">✈️ ${orig}</button>`;
+    ">${orig}</button>`;
   });
 
   grid.innerHTML = btns;
@@ -1796,17 +1793,25 @@ function renderDiasFilter() {
   section.style.display = 'block';
 
   const grid = document.getElementById('diasFilterGrid');
-  const allActive = state.diasFilter === 'ALL';
+  const allActive = state.diasFilter.length === 0;
   grid.innerHTML =
     `<button class="city-btn all-btn ${allActive ? 'active' : ''}" data-dval="ALL">TODOS</button>` +
     dias.map(d => {
-      const isActive = state.diasFilter === d;
+      const isActive = state.diasFilter.includes(String(d));
       return `<button class="city-btn ${isActive ? 'active' : ''}" data-dval="${d}">${d}d</button>`;
     }).join('');
 
   grid.querySelectorAll('button[data-dval]').forEach(btn => {
     btn.addEventListener('click', () => {
-      state.diasFilter = btn.getAttribute('data-dval');
+      const val = btn.getAttribute('data-dval');
+      if (val === 'ALL') {
+        state.diasFilter = [];
+      } else {
+        const s = String(val);
+        const i = state.diasFilter.indexOf(s);
+        if (i >= 0) state.diasFilter.splice(i, 1);
+        else state.diasFilter.push(s);
+      }
       state.currentPage = 0;
       debouncedRender();
     });
@@ -1833,9 +1838,6 @@ const SORT_V = [
   {col:'PREÇO', label:'Preço'},
   {col:'DATA_DE_IDA', label:'Data Ida'},
   {col:'_dias', label:'Dias'},
-  {col:'MILHAS', label:'Milhas'},
-  {col:'PARA', label:'Destino A→Z'},
-  {col:'_file_date', label:'Data Busca'},
 ];
 
 function renderSortBar() {
