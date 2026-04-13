@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Buscador de Viagens</title>
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
@@ -328,12 +328,14 @@ td { padding: 9px 13px; vertical-align: middle; }
         <div id="diasFilterBody" style="display:none">
           <div class="city-grid" id="diasFilterGrid"></div>
         </div>
+      </div>
+
       <!-- BUSCA RÁPIDA -->
       <div class="sidebar-section">
         <div class="sidebar-label">Busca rápida</div>
         <div class="search-wrap">
           <span class="si">🔍</span>
-          <input type="text" id="searchInput" placeholder="país, cidade, aeroporto...">
+          <input type="text" id="searchInput" placeholder="país, cidade, aeroporto..." inputmode="search" onblur="if(/iPhone|iPad|iPod/.test(navigator.userAgent)){document.querySelector('meta[name=viewport]').content='width=device-width,initial-scale=1.0,maximum-scale=1.0';}">
         </div>
       </div>
 
@@ -346,14 +348,14 @@ td { padding: 9px 13px; vertical-align: middle; }
       </div>
       <div id="status-bar-mobile"></div>
       <div id="dataSection" style="display:none">
-        <div class="toolbar">
-          <button class="view-toggle-btn" id="viewToggleBtn" onclick="toggleView()">🗺️ Mapa</button>
-          <div class="sort-group" id="sortGroup"></div>
-          <div class="result-count" id="resultCount"></div>
-        </div>
         <div id="contentRow">
           <div id="mapCol">
             <div id="mapView"></div>
+          </div>
+          <div class="toolbar" style="margin-top:10px">
+            <button class="view-toggle-btn" id="viewToggleBtn" onclick="toggleView()">🗺️ Mapa</button>
+            <div class="sort-group" id="sortGroup"></div>
+            <div class="result-count" id="resultCount"></div>
           </div>
           <div id="listCol">
             <div class="table-wrap" id="tableWrapEl">
@@ -1856,6 +1858,8 @@ function renderTable() {
   const section = document.getElementById('dataSection');
   if (!state.files.length) { empty.style.display='block'; section.style.display='none'; return; }
   empty.style.display='none'; section.style.display='block';
+  // Forçar primeiro render do mapa após DOM estar visível
+  setTimeout(() => { if (typeof maybeRenderMap === 'function') { maybeRenderMap(); if (leafletMap) leafletMap.invalidateSize(true); } }, 150);
 
   const { rows, total } = getFiltered();
   const start = state.currentPage * PAGE_SIZE;
@@ -4559,8 +4563,10 @@ function makeDotIcon(accentColor) {
 
 // Price label marker — só aparece com zoom suficiente
 function makePriceIcon(priceStr, accentColor) {
-  const isGmaps = (window._currentTile || 'gmaps') === 'gmaps';
-  const textColor = isGmaps ? '#000' : '#fff';
+  const tile = window._currentTile || 'gmaps';
+  const isGmaps = tile === 'gmaps';
+  const isDark  = tile === 'dark';
+  const textColor   = (isDark || !isGmaps) ? '#fff' : '#000';
   const borderColor = isGmaps ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.25)';
   return L.divIcon({
     className: '',
