@@ -328,6 +328,8 @@ td { padding: 9px 13px; vertical-align: middle; }
         <div id="diasFilterBody" style="display:none">
           <div class="city-grid" id="diasFilterGrid"></div>
         </div>
+      </div>
+
       <!-- BUSCA RÁPIDA -->
       <div class="sidebar-section">
         <div class="sidebar-label">Busca rápida</div>
@@ -4458,8 +4460,9 @@ function hideDesktopMap() {
 
 function maybeRenderMap() {
   if (isMobileView()) {
-    // Mobile: mapa sempre visível — renderizar sempre
+    // Mobile: mapa sempre visível — renderizar e forçar recalc de tamanho
     renderMap();
+    setTimeout(() => { if (leafletMap) leafletMap.invalidateSize(); }, 200);
   } else {
     // Desktop: render if mapCol is visible
     const mapCol = document.getElementById('mapCol');
@@ -4679,9 +4682,15 @@ function renderMap() {
 
   // Init map once
   if (!leafletMap) {
+    // Garantir que o elemento tem dimensões antes de inicializar (fix mobile branco)
+    const _style = mapEl.style;
+    const _wasHidden = (_style.display === 'none' || _style.display === '');
+    if (_wasHidden) { _style.display = 'block'; }
     leafletMap = L.map('mapView', {
       center: [15, 0], zoom: 2, minZoom: 1, maxZoom: 14,
     });
+    // Fix Leaflet blank tile on mobile — force size recalc after DOM paint
+    setTimeout(() => { if (leafletMap) leafletMap.invalidateSize(); }, 100);
     const _tileUrls = {
       dark:  'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
       osm:   'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
