@@ -147,7 +147,7 @@ main { padding: 22px 26px; overflow-x: hidden; }
 .result-count b { color: var(--text); }
 
 /* TABLE */
-#mapView { width:100%; height:calc(100vh - 160px); border-radius:var(--radius); border:1px solid var(--border); overflow:hidden; display:none; }
+#mapView { width:100%; height:calc(100vh - 160px); border-radius:var(--radius); border:1px solid var(--border); overflow:hidden; }
 #contentRow { display:flex; gap:16px; align-items:flex-start; }
 #listCol { flex:2; min-width:0; }
 #mapCol { flex:1; min-width:0; position:sticky; top:53px; display:none; }
@@ -214,10 +214,10 @@ td { padding: 9px 13px; vertical-align: middle; }
   /* Mobile: mapa sempre visível, sem botão toggle */
   .view-toggle-btn { display:none !important; }
   #contentRow { display:block; }
-  #mapCol { position:static; display:block !important; width:90%; margin:0 auto; }
-  #mapCol #mapView { display:block !important; height:calc((100vh - 160px) * 0.7); }
+  #mapCol { position:static !important; display:block !important; width:90%; margin:0 auto 14px auto; }
+  #mapCol #mapView { display:block !important; height:300px !important; width:100%; }
   #mapCol.mobile-map-visible { display:block !important; }
-  #mapCol.mobile-map-visible #mapView { display:block !important; height:calc((100vh - 160px) * 0.7); }
+  #mapCol.mobile-map-visible #mapView { display:block !important; height:300px !important; width:100%; }
   #listCol .table-wrap { display:block; }
   #listCol .table-wrap.mobile-hidden { display:none; }
 }
@@ -328,8 +328,6 @@ td { padding: 9px 13px; vertical-align: middle; }
         <div id="diasFilterBody" style="display:none">
           <div class="city-grid" id="diasFilterGrid"></div>
         </div>
-      </div>
-
       <!-- BUSCA RÁPIDA -->
       <div class="sidebar-section">
         <div class="sidebar-label">Busca rápida</div>
@@ -4460,9 +4458,10 @@ function hideDesktopMap() {
 
 function maybeRenderMap() {
   if (isMobileView()) {
-    // Mobile: mapa sempre visível — renderizar e forçar recalc de tamanho
+    // Mobile: mapa sempre visível — renderizar sempre
     renderMap();
-    setTimeout(() => { if (leafletMap) leafletMap.invalidateSize(); }, 200);
+    setTimeout(() => { if (leafletMap) leafletMap.invalidateSize(true); }, 300);
+    setTimeout(() => { if (leafletMap) leafletMap.invalidateSize(true); }, 700);
   } else {
     // Desktop: render if mapCol is visible
     const mapCol = document.getElementById('mapCol');
@@ -4682,15 +4681,9 @@ function renderMap() {
 
   // Init map once
   if (!leafletMap) {
-    // Garantir que o elemento tem dimensões antes de inicializar (fix mobile branco)
-    const _style = mapEl.style;
-    const _wasHidden = (_style.display === 'none' || _style.display === '');
-    if (_wasHidden) { _style.display = 'block'; }
     leafletMap = L.map('mapView', {
       center: [15, 0], zoom: 2, minZoom: 1, maxZoom: 14,
     });
-    // Fix Leaflet blank tile on mobile — force size recalc after DOM paint
-    setTimeout(() => { if (leafletMap) leafletMap.invalidateSize(); }, 100);
     const _tileUrls = {
       dark:  'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
       osm:   'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
@@ -4764,7 +4757,8 @@ function renderMap() {
     try { leafletMap.fitBounds(L.latLngBounds(coords), { padding: [30, 30], maxZoom: 5 }); } catch(e) {}
   }
 
-  setTimeout(() => { if (leafletMap) leafletMap.invalidateSize(); }, 80);
+  setTimeout(() => { if (leafletMap) leafletMap.invalidateSize(true); }, 80);
+  setTimeout(() => { if (leafletMap) leafletMap.invalidateSize(true); }, 400);
 }
 
 
