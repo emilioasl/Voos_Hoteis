@@ -215,9 +215,9 @@ td { padding: 9px 13px; vertical-align: middle; }
   .view-toggle-btn { display:none !important; }
   #contentRow { display:block; }
   #mapCol { position:static !important; display:block !important; width:90%; margin:0 auto 14px auto; }
-  #mapCol #mapView { display:block !important; height:300px !important; width:100%; }
+  #mapCol #mapView { display:block !important; height:350px !important; width:100%; }
   #mapCol.mobile-map-visible { display:block !important; }
-  #mapCol.mobile-map-visible #mapView { display:block !important; height:300px !important; width:100%; }
+  #mapCol.mobile-map-visible #mapView { display:block !important; height:350px !important; width:100%; }
   #listCol .table-wrap { display:block; }
   #listCol .table-wrap.mobile-hidden { display:none; }
 }
@@ -387,7 +387,7 @@ td { padding: 9px 13px; vertical-align: middle; }
           <button class="sticky-toggle-btn" id="stickyToggleBtn" onclick="toggleStickyHeader()">
             📌 Header Off
           </button>
-          <button id="mapTile_dark"  onclick="setMapTile('dark')"  class="sticky-toggle-btn">🌑 Darkmode</button>
+          <button id="mapTile_dark"  onclick="setMapTile('dark')"  class="sticky-toggle-btn">🌑 Dark</button>
           <button id="mapTile_osm"   onclick="setMapTile('osm')"   class="sticky-toggle-btn">🗺️ OSM</button>
           <button id="mapTile_gmaps" onclick="setMapTile('gmaps')" class="sticky-toggle-btn active" style="background:var(--mode-accent);color:#fff;border-color:var(--mode-accent)">🟢 GMaps</button>
         </div>
@@ -4536,7 +4536,7 @@ function getBestPriceByDest(rows) {
   const best = {};
   for (const iata of Object.keys(buckets)) {
     const sorted = buckets[iata].sort((a, b) => a.price - b.price);
-    best[iata] = { ...sorted[0], top5: sorted.slice(0, 5) };
+    best[iata] = { ...sorted[0], top5: sorted.slice(0, 4) };
   }
   return best;
 }
