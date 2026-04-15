@@ -139,6 +139,7 @@ aside { border-right: 1px solid var(--border); background: var(--surface); paddi
 /* MAIN */
 main { padding: 22px 26px; overflow-x: hidden; }
 .toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
+#toolbarRow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
 .sort-group { display: flex; gap: 5px; flex-wrap: wrap; }
 .sort-btn { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); color: var(--text-muted); font-size: 12px; padding: 6px 12px; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
 .sort-btn:hover { border-color: var(--mode-accent); color: var(--mode-accent); }
@@ -348,14 +349,14 @@ td { padding: 9px 13px; vertical-align: middle; }
       </div>
       <div id="status-bar-mobile"></div>
       <div id="dataSection" style="display:none">
-        <div id="contentRow" style="padding-top:8px">
-          <div id="mapCol">
-            <div id="mapView"></div>
-          </div>
-          <div class="toolbar" style="margin-top:10px">
+        <div id="toolbarRow">
             <button class="view-toggle-btn" id="viewToggleBtn" onclick="toggleView()">🗺️ Mapa</button>
             <div class="sort-group" id="sortGroup"></div>
             <div class="result-count" id="resultCount"></div>
+          </div>
+        <div id="contentRow" style="padding-top:8px">
+          <div id="mapCol">
+            <div id="mapView"></div>
           </div>
           <div id="listCol">
             <div class="table-wrap" id="tableWrapEl">
@@ -1102,14 +1103,23 @@ async function loadFromGitHub() {
       state.files.push({ name: f.name, date, dateTs, isLatest: f.isLatest, count: rows.length });
       rows.forEach(row => {
         // For hoteis mode: compute Checkout_Date from Checkin_Date + # Days
-        if (state.mode === 'hoteis' && row['Checkin_Date'] && !row['Checkout_Date']) {
-          const days = parseInt(row['# Days'] || 0);
-          if (days > 0) {
-            const d = new Date(row['Checkin_Date'] + 'T12:00:00');
-            d.setDate(d.getDate() + days);
-            row['Checkout_Date'] = d.toISOString().substring(0, 10);
+        if (state.mode === 'hoteis' && row['Checkin_Date']) {
+          // Normaliza Checkin_Date: aceita "09-05-26" (DD-MM-YY) e "2026-05-09" (ISO)
+          const _rawCI = String(row['Checkin_Date']).trim();
+          const _parts = _rawCI.match(/^(\d{2})-(\d{2})-(\d{2,4})$/);
+          if (_parts) {
+            let yr = parseInt(_parts[3]); if (yr < 100) yr += 2000;
+            row['Checkin_Date'] = yr + '-' + _parts[2] + '-' + _parts[1];
           }
-          row['_dias'] = days || '';
+          if (!row['Checkout_Date']) {
+            const days = parseInt(row['# Days'] || 0);
+            if (days > 0) {
+              const d = new Date(row['Checkin_Date'] + 'T12:00:00');
+              d.setDate(d.getDate() + days);
+              row['Checkout_Date'] = d.toISOString().substring(0, 10);
+            }
+            row['_dias'] = days || '';
+          }
         }
         // Parse DATA_DE_IDA into separate ida/volta for voos mode
         if (state.mode === 'voos' && row['DATA_DE_IDA']) {
