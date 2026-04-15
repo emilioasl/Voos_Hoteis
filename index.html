@@ -1171,17 +1171,25 @@ async function loadFromGitHub() {
       });
     }
 
-    // VOOS: mantém todas as linhas de todos os arquivos.
-    // Para cada cidade+data+preço, se aparecer em múltiplos arquivos, usa só o mais recente.
-    if (state.mode === 'voos') {
-      // Dedup: mesma cidade + mesma data de ida + mesmo preço → mantém só a do arquivo mais recente
-      const bestRow = {}; // key: PARA|DATA|PREÇO → row com maior _file_date_ts
+    // DEDUP: para ambos os modos, mantém só o preço mais recente por destino+data
+    // Hoteis: chave = City|Checkin_Date|Hotel Name
+    // Voos:   chave = PARA|DATA_DE_IDA  (sem preço — mostra sempre o preço mais recente)
+    {
+      const bestRow = {};
       for (const row of state.allRows) {
-        const k = [
-          (row['PARA']        || '').trim().toUpperCase(),
-          (row['DATA_DE_IDA'] || '').trim(),
-          (row['PREÇO']       || '').trim(),
-        ].join('|');
+        let k;
+        if (state.mode === 'hoteis') {
+          k = [
+            (row['City']         || row['PARA'] || '').trim().toUpperCase(),
+            (row['Checkin_Date'] || '').trim(),
+            (row['Hotel Name']   || '').trim(),
+          ].join('|');
+        } else {
+          k = [
+            (row['PARA']        || '').trim().toUpperCase(),
+            (row['DATA_DE_IDA'] || '').trim(),
+          ].join('|');
+        }
         if (!bestRow[k] || row._file_date_ts > bestRow[k]._file_date_ts) {
           bestRow[k] = row;
         }
