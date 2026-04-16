@@ -986,7 +986,7 @@ function parseGoogleDate(raw) {
   };
 }
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = window.innerWidth <= 768 ? 10 : 20;
 
 // Número → string formatada: 3000 → "3.000"
 function fmtN(val) {
