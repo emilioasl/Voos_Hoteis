@@ -419,6 +419,7 @@ const state = {
   viewMode: 'list',      // 'list' | 'map'
   selectedOrigin: 'ALL', // 'ALL' | código IATA da origem (SAO, FLN, GIG...)
   classFilter: 'ECO',    // 'ECO' | 'EXE'
+  _originManuallyReset: false, // true após resetAllFilters — impede auto-default SAO
 };
 
 // ── UTILS ──────────────────────────────────────────────────────────────────
@@ -1003,6 +1004,7 @@ function enterMode(mode) {
   state.idaVoltaFilter = 'idavolta';
   state.viewMode = 'list';
   state.classFilter = mode === 'hoteis' ? 'ALL' : 'ECO';
+  state._originManuallyReset = false; // allow auto-default SAO on fresh load
   document.getElementById('landing').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   document.body.className = mode === 'voos' ? 'mode-voos' : '';
@@ -1022,6 +1024,7 @@ function switchMode() {
   state.idaVoltaFilter = 'idavolta';
   state.viewMode = 'list';
   state.selectedOrigin = 'ALL';
+  state._originManuallyReset = false; // allow auto-default SAO on fresh mode switch
   state.classFilter = m === 'hoteis' ? 'ALL' : 'ECO';
   // Reset mobile toggle button
   const btn = document.getElementById('viewToggleBtn');
@@ -1608,8 +1611,8 @@ function renderOriginFilter() {
   // Hide if only 1 origin
   if (origins.length <= 1) { section.style.display = 'none'; return; }
 
-  // Default to SAO if not yet set and SAO exists (voos only)
-  if (state.mode === 'voos' && state.selectedOrigin === 'ALL' && origins.includes('SAO')) {
+  // Default to SAO on FIRST load only (not after a manual reset)
+  if (state.mode === 'voos' && state.selectedOrigin === 'ALL' && origins.includes('SAO') && !state._originManuallyReset) {
     state.selectedOrigin = 'SAO';
   }
 
@@ -1643,6 +1646,7 @@ function renderOriginFilter() {
   grid.querySelectorAll('button[data-oval]').forEach(btn => {
     btn.addEventListener('click', () => {
       state.selectedOrigin = btn.getAttribute('data-oval');
+      state._originManuallyReset = false; // user chose explicitly — allow future auto-default
       state.currentPage = 0;
       _invalidateCountCache();
       renderOriginFilter(); // update button styles immediately
@@ -1672,9 +1676,10 @@ function resetAllFilters() {
   state.currentPage     = 0;
   state.feriadoFilter   = [];
   state.regiaoFilter    = [];
-  state.diasFilter      = 'ALL';
+  state.diasFilter      = [];
   state.idaVoltaFilter  = 'idavolta';
   state.selectedOrigin  = 'ALL';
+  state._originManuallyReset = true;
   state.classFilter     = 'ECO';
   const inp = document.getElementById('searchInput');
   if (inp) inp.value = '';
