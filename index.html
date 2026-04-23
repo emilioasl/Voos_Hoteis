@@ -939,6 +939,18 @@ function fmtDate(str) {
     const d = new Date(`${yyyy}-${mm}-${dd}T12:00:00`);
     if (!isNaN(d)) return `${dd}/${MESES[d.getMonth()]}/${yyyy}`;
   }
+  // dd-Mmm-yy or dd-Mmm-yyyy: 12-Dec-26, 17-Apr-26, 03-Jan-2027
+  if (/^\d{1,2}-[A-Za-z]{3,4}-\d{2,4}$/.test(str)) {
+    const parts = str.split('-');
+    const dd  = String(parseInt(parts[0])).padStart(2,'0');
+    const mon = parts[1].toLowerCase().substring(0,3);
+    let yyyy  = parseInt(parts[2]); if (yyyy < 100) yyyy += 2000;
+    const EN_MESES = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+    const PT_MESES = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+    let idx = EN_MESES.indexOf(mon);
+    if (idx < 0) idx = PT_MESES.indexOf(mon);
+    if (idx >= 0) return `${dd}/${MESES[idx]}/${yyyy}`;
+  }
   // dd/mes-abr/yyyy: 18/jul/2026 (already good) or 18/07/26
   if (/^\d{2}\/\d{2}\/\d{2}$/.test(str)) {
     const [dd,mm,yy] = str.split('/');
@@ -2015,8 +2027,8 @@ function rowV(r) {
     <td><span class="badge-dest voo">${r.PARA||'?'}</span></td>
     <td><div style="font-size:12px">${r.CIDADE||'-'}</div><small style="color:var(--text-dim)">${r['PAÍS']||''}</small></td>
     <td>${(()=>{ const v=r.DATA_VOLTA||''; const ok=v&&v!=='-'&&v.toLowerCase()!=='unknown'; return ok?'<span style="font-size:11px;padding:2px 8px;border-radius:4px;background:#e8f0ff;color:#0052cc;font-weight:500">Ida e Volta</span>':'<span style="font-size:11px;padding:2px 8px;border-radius:4px;background:#f7f8fa;color:#5a6072">Apenas Ida</span>'; })()}</td>
-    <td style="font-family:var(--mono);font-size:12px"><div>${fmtDate(idaISO)}</div><small style="color:var(--text-dim)">${idaDow}</small></td>
-    <td style="font-family:var(--mono);font-size:12px;color:var(--text-muted)"><div>${voltaISO ? fmtDate(voltaISO) : '-'}</div><small style="color:var(--text-dim)">${voltaDow}</small></td>
+    <td style="font-family:var(--mono);font-size:12px"><div>${fmtDate(idaISO)}</div></td>
+    <td style="font-family:var(--mono);font-size:12px;color:var(--text-muted)"><div>${voltaISO ? fmtDate(voltaISO) : '-'}</div></td>
     <td style="font-family:var(--mono);font-size:12px;color:var(--text-muted)">${diasDisplay}</td>
     <td style="font-family:var(--mono);font-size:12px">${r.HORÁRIO||'-'}</td>
     <td><span class="badge-escala ${isDireto?'direto':'escala'}">${r.ESCALA||'-'}</span></td>
