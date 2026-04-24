@@ -1691,8 +1691,8 @@ function resetAllFilters() {
   state.regiaoFilter    = [];
   state.diasFilter      = [];
   state.idaVoltaFilter  = 'idavolta';
-  state.selectedOrigin  = 'ALL';
-  state._originManuallyReset = true;
+  state.selectedOrigin       = 'SAO';
+  state._originManuallyReset = false;
   state.classFilter     = 'ECO';
   const inp = document.getElementById('searchInput');
   if (inp) inp.value = '';
@@ -1819,12 +1819,17 @@ function renderFileList() {
 function renderDiasFilter() {
   const section = document.getElementById('diasFilterSection');
   if (!section) return;
-  // Show for both voos and hoteis modes when there are rows with _dias
 
-  // Get ALL currently filtered rows (ignoring dias filter) — not just current page
-  // Sem getAllFiltered — usa allRows direto para pegar lista de dias disponíveis
+  // Usa getAllFiltered ignorando diasFilter — respeita todos os outros filtros ativos
+  // (data de ida, mês, origem, etc.) para mostrar só os dias realmente disponíveis
+  const filteredRows = getAllFiltered({ diasFilter: [] });
   const diasSet = new Set();
-  state.allRows.forEach(r => { if (r._dias) diasSet.add(String(r._dias)); });
+  filteredRows.forEach(r => { if (r._dias) diasSet.add(String(r._dias)); });
+
+  // Remove botões ativos que não existem mais nos resultados filtrados
+  if (state.diasFilter.length > 0) {
+    state.diasFilter = state.diasFilter.filter(d => diasSet.has(d));
+  }
 
   const dias = [...diasSet].sort((a, b) => parseInt(a) - parseInt(b));
   if (!dias.length) { section.style.display = 'none'; return; }
