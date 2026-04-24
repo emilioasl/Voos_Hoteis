@@ -1214,6 +1214,7 @@ async function loadFromGitHub() {
           k = [
             (row['PARA']        || '').trim().toUpperCase(),
             (row['DATA_DE_IDA'] || '').trim(),
+            (row['DATA_VOLTA']  || '').trim(), // inclui volta: OW e ida+volta coexistem
           ].join('|');
         }
         if (!bestRow[k] || row._file_date_ts > bestRow[k]._file_date_ts) {
