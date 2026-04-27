@@ -1204,6 +1204,7 @@ async function loadFromGitHub() {
 
     // ── JOIN: em modo hoteis, busca preço e link REAIS do CSV de voos ──────────
     // Chave: IATA (City do hotel = PARA do voo) + Checkin_Date = DATA_DE_IDA + Checkout_Date = DATA_VOLTA
+    let vooMap = {};
     if (state.mode === 'hoteis' && vooFilesForJoin.length > 0) {
 
       // 1. Carrega todos os voos ida+volta (sem OW) dos CSVs de voos
@@ -1259,24 +1260,7 @@ async function loadFromGitHub() {
         } catch (e) { /* arquivo inacessível — ignora */ }
       }
 
-      // 2. Para cada linha de hotel, busca o voo correspondente pelo IATA + datas
-      for (const row of state.allRows) {
-        const iata    = (row['City'] || '').trim().toUpperCase();
-        const checkin  = (row['Checkin_Date']  || '').trim().substring(0, 10);
-        const checkout = (row['Checkout_Date'] || '').trim().substring(0, 10);
-        if (!iata || !checkin || !checkout) continue;
-
-        const k   = `${iata}|${checkin}|${checkout}`;
-        const voo = vooMap[k];
-
-        if (voo) {
-          const hotelPrice    = parsePrice(row['Price']) || 0;
-          row['Air Price']    = voo.preco;
-          row['url_flight']   = voo.url;
-          row['Final Price']  = Math.round(hotelPrice + voo.preco);
-        }
-        // Se não achou voo: mantém Air Price/url_flight/Final Price que vieram do CSV de hotel (fallback)
-      }
+      // Injection happens AFTER DEDUP — stored in vooMap for later use
     }
 
     // DEDUP: para ambos os modos, mantém só o preço mais recente por destino+data
@@ -1304,6 +1288,23 @@ async function loadFromGitHub() {
         }
       }
       state.allRows = Object.values(bestRow);
+    }
+
+    // ── JOIN inject: agora que DEDUP finalizou state.allRows, injeta preço/link reais do voo ──
+    if (state.mode === 'hoteis' && Object.keys(vooMap).length > 0) {
+      for (const r of state.allRows) {
+        const iata     = (r['City'] || '').trim().toUpperCase();
+        const checkin  = (r['Checkin_Date']  || '').trim().substring(0, 10);
+        const checkout = (r['Checkout_Date'] || '').trim().substring(0, 10);
+        if (!iata || !checkin || !checkout) continue;
+        const voo = vooMap[`${iata}|${checkin}|${checkout}`];
+        if (voo) {
+          const hotelPrice  = parsePrice(r['Price']) || 0;
+          r['Air Price']    = voo.preco;
+          r['url_flight']   = voo.url;
+          r['Final Price']  = Math.round(hotelPrice + voo.preco);
+        }
+      }
     }
 
     // Normalize _dias for ALL voos rows — ensures sort works correctly
