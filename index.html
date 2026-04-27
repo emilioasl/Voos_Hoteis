@@ -1202,77 +1202,80 @@ async function loadFromGitHub() {
       });
     }
 
-    // ── JOIN: em modo hoteis, carrega voos e injeta Air Price + url_flight reais ──
+    // ── JOIN: em modo hoteis, busca preço e link REAIS do CSV de voos ──────────
+    // Chave: IATA (City do hotel = PARA do voo) + Checkin_Date = DATA_DE_IDA + Checkout_Date = DATA_VOLTA
     if (state.mode === 'hoteis' && vooFilesForJoin.length > 0) {
-      // Mapa: "PARA|DATA_DE_IDA|DATA_VOLTA" → melhor voo (arquivo mais recente)
+
+      // 1. Carrega todos os voos ida+volta (sem OW) dos CSVs de voos
+      //    Mapa: "IATA|YYYY-MM-DD_ida|YYYY-MM-DD_volta" → { preco, url, dateTs }
       const vooMap = {};
+
       for (const vf of vooFilesForJoin) {
-        const rawUrl = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${GITHUB_BRANCH}/${vf.path}`;
+        const vDateTs = dateToTs(extractDate(vf.name));
+        const rawUrl  = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${GITHUB_BRANCH}/${vf.path}`;
         try {
-          const text = await (await fetch(rawUrl)).text();
+          const text    = await (await fetch(rawUrl)).text();
           const vooRows = parseCSV(text);
-          const vDateTs = dateToTs(extractDate(vf.name));
+
           for (const vr of vooRows) {
-            if (!vr['DATA_DE_IDA'] && !vr['DATA_DE_IDA']) continue;
-            const idaISO   = partToISO(vr['DATA_DE_IDA'] || '');
-            const rawV     = vr['VOLTA'] || '';
-            let voltaISO   = '';
-            if (rawV) {
-              const idaYear = idaISO ? parseInt(idaISO.split('-')[0]) : new Date().getFullYear();
-              const idaMon  = idaISO ? parseInt(idaISO.split('-')[1]) : 1;
-              const vP = partToISO(rawV);
-              if (vP) {
-                const vMon = parseInt(vP.split('-')[1]);
-                voltaISO = /^\d{1,2}-[A-Za-z]{2,4}-\d{2,4}$/.test(rawV)
-                  ? vP
-                  : partToISO(rawV, vMon < idaMon ? idaYear + 1 : idaYear);
+            const para = (vr['PARA'] || '').trim().toUpperCase();
+            if (!para) continue;
+
+            // Converte datas do voo para ISO YYYY-MM-DD
+            const idaISO   = (partToISO(vr['DATA_DE_IDA'] || '') || '').substring(0, 10);
+            const voltaRaw = vr['VOLTA'] || '';
+            if (!idaISO || !voltaRaw || voltaRaw === '-' || voltaRaw.toLowerCase() === 'unknown') continue;
+
+            // Infere ano da volta (pode cruzar ano)
+            let voltaISO = '';
+            const vParsed = partToISO(voltaRaw);
+            if (vParsed) {
+              if (/^\d{1,2}-[A-Za-z]{2,4}-\d{2,4}$/.test(voltaRaw)) {
+                voltaISO = vParsed.substring(0, 10); // ano explícito
+              } else {
+                const idaMon  = parseInt(idaISO.split('-')[1]);
+                const idaYear = parseInt(idaISO.split('-')[0]);
+                const vMon    = parseInt(vParsed.split('-')[1]);
+                const yr      = vMon < idaMon ? idaYear + 1 : idaYear;
+                voltaISO = (partToISO(voltaRaw, yr) || '').substring(0, 10);
               }
             }
-            // só ida+volta
-            if (!voltaISO || voltaISO === '-') continue;
+            if (!voltaISO) continue;
 
-            // LATAM RT: dobrar preço
-            let precoVoo = parseFloat((vr['PREÇO'] || '0').replace(/[^0-9.]/g, ''));
-            const vUrl = vr['URL'] || '';
-            if (vUrl.includes('latamairlines.com') && vUrl.includes('trip=RT')) {
-              precoVoo = Math.round(precoVoo * 2);
+            // Preço: ajusta LATAM RT
+            let preco = parseFloat((vr['PREÇO'] || '0').replace(/[^0-9.]/g, ''));
+            const url = vr['URL'] || '';
+            if (url.includes('latamairlines.com') && url.includes('trip=RT')) {
+              preco = Math.round(preco * 2);
             }
 
-            const k = [
-              (vr['PARA'] || '').trim().toUpperCase(),
-              (idaISO   || '').trim(),
-              (voltaISO || '').trim(),
-            ].join('|');
+            const k = `${para}|${idaISO}|${voltaISO}`;
 
-            // Guarda o voo mais recente para cada combinação destino+datas
-            if (!vooMap[k] || vDateTs > vooMap[k]._vDateTs) {
-              vooMap[k] = {
-                _vDateTs  : vDateTs,
-                _airPrice : precoVoo,
-                _airUrl   : vUrl,
-                _idaISO   : idaISO,
-                _voltaISO : voltaISO,
-              };
+            // Guarda apenas o mais recente por chave
+            if (!vooMap[k] || vDateTs > vooMap[k].dateTs) {
+              vooMap[k] = { preco, url, dateTs: vDateTs };
             }
           }
-        } catch(e) { /* ignora arquivo de voo inacessível */ }
+        } catch (e) { /* arquivo inacessível — ignora */ }
       }
 
-      // Injeta dados do voo em cada linha de hotel
+      // 2. Para cada linha de hotel, busca o voo correspondente pelo IATA + datas
       for (const row of state.allRows) {
-        const city      = (row['City'] || row['PARA'] || '').trim().toUpperCase();
-        const checkin   = (row['Checkin_Date']  || '').trim().substring(0, 10);
-        const checkout  = (row['Checkout_Date'] || '').trim().substring(0, 10);
-        const k = [city, checkin, checkout].join('|');
+        const iata    = (row['City'] || '').trim().toUpperCase();
+        const checkin  = (row['Checkin_Date']  || '').trim().substring(0, 10);
+        const checkout = (row['Checkout_Date'] || '').trim().substring(0, 10);
+        if (!iata || !checkin || !checkout) continue;
+
+        const k   = `${iata}|${checkin}|${checkout}`;
         const voo = vooMap[k];
+
         if (voo) {
-          row['Air Price']  = voo._airPrice;
-          row['url_flight'] = voo._airUrl;
-          // Recalcula Final Price = hotel + voo real
-          const hotelPrice = parseFloat((row['Price'] || '0').toString().replace(/[^0-9.]/g, ''));
-          row['Final Price'] = Math.round(hotelPrice + voo._airPrice);
+          const hotelPrice    = parseFloat((row['Price'] || '0').toString().replace(/[^0-9.]/g, '')) || 0;
+          row['Air Price']    = voo.preco;
+          row['url_flight']   = voo.url;
+          row['Final Price']  = Math.round(hotelPrice + voo.preco);
         }
-        // Se não encontrou voo, mantém Air Price/url_flight do CSV de hotel (fallback)
+        // Se não achou voo: mantém Air Price/url_flight/Final Price que vieram do CSV de hotel (fallback)
       }
     }
 
