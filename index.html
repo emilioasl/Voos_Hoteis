@@ -1243,7 +1243,7 @@ async function loadFromGitHub() {
             if (!voltaISO) continue;
 
             // Preço: ajusta LATAM RT
-            let preco = parseFloat((vr['PREÇO'] || '0').replace(/[^0-9.]/g, ''));
+            let preco = parsePrice(vr['PREÇO']);
             const url = vr['URL'] || '';
             if (url.includes('latamairlines.com') && url.includes('trip=RT')) {
               preco = Math.round(preco * 2);
@@ -1270,7 +1270,7 @@ async function loadFromGitHub() {
         const voo = vooMap[k];
 
         if (voo) {
-          const hotelPrice    = parseFloat((row['Price'] || '0').toString().replace(/[^0-9.]/g, '')) || 0;
+          const hotelPrice    = parsePrice(row['Price']) || 0;
           row['Air Price']    = voo.preco;
           row['url_flight']   = voo.url;
           row['Final Price']  = Math.round(hotelPrice + voo.preco);
