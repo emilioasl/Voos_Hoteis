@@ -1197,10 +1197,23 @@ async function loadFromGitHub() {
       });
     }
 
-    // DEDUP: para ambos os modos, mantém só o preço mais recente por destino+data
+    // DEDUP: para ambos os modos, mantém só o registro mais recente por destino+data
     // Hoteis: chave = City|Checkin_Date|Hotel Name
-    // Voos:   chave = PARA|DATA_DE_IDA  (sem preço — mostra sempre o preço mais recente)
+    // Voos:   chave = PARA|DATA_DE_IDA|DATA_VOLTA
+    //         → OW (DATA_VOLTA='') e ida+volta têm chaves distintas e coexistem
+    //         → Entre duplicatas da mesma chave, vence o arquivo mais recente (_file_date_ts)
     {
+      // No modo hoteis, remover voos OW (sem DATA_VOLTA) pois pacote exige ida+volta
+      if (state.mode === 'hoteis') {
+        state.allRows = state.allRows.filter(row => {
+          // Linha de hotel: sempre mantém
+          if (row['Checkin_Date'] || row['Hotel Name']) return true;
+          // Linha de voo: só mantém se tiver volta
+          const v = (row['DATA_VOLTA'] || '').trim();
+          return v && v !== '-' && v.toLowerCase() !== 'unknown';
+        });
+      }
+
       const bestRow = {};
       for (const row of state.allRows) {
         let k;
@@ -1214,9 +1227,10 @@ async function loadFromGitHub() {
           k = [
             (row['PARA']        || '').trim().toUpperCase(),
             (row['DATA_DE_IDA'] || '').trim(),
-            (row['DATA_VOLTA']  || '').trim(), // inclui volta: OW e ida+volta coexistem
+            (row['DATA_VOLTA']  || '').trim(), // OW e ida+volta coexistem
           ].join('|');
         }
+        // Sempre vence o arquivo mais recente (independente de preço)
         if (!bestRow[k] || row._file_date_ts > bestRow[k]._file_date_ts) {
           bestRow[k] = row;
         }
