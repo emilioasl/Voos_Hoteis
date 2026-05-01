@@ -1,0 +1,5161 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Buscador de Viagens</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<style>
+:root {
+  --bg: #ffffff;
+  --surface: #f7f8fa;
+  --surface2: #eef0f4;
+  --border: #e2e5ec;
+  --border2: #d0d4de;
+  --accent-h: #0052cc;
+  --accent-h-light: #e8f0ff;
+  --accent-v: #00875a;
+  --accent-v-light: #e3f5ee;
+  --warn: #e85d04;
+  --text: #1a1d27;
+  --text-muted: #5a6072;
+  --text-dim: #9ba3b5;
+  --radius: 8px;
+  --mono: 'Space Mono', monospace;
+  --sans: 'DM Sans', sans-serif;
+  --mode-accent: var(--accent-h);
+  --mode-light: var(--accent-h-light);
+}
+body.mode-voos {
+  --mode-accent: var(--accent-v);
+  --mode-light: var(--accent-v-light);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; }
+
+
+/* ── TOGGLE PILL ── */
+.toggle-pill {
+  display: flex; border-radius: 8px; overflow: hidden;
+  border: 1.5px solid var(--border2); background: var(--surface2);
+  width: 100%;
+}
+.toggle-pill button {
+  flex: 1; padding: 7px 0; font-size: 12px; font-weight: 500;
+  border: none; background: transparent; color: var(--text-muted);
+  cursor: pointer; transition: all 0.15s; font-family: var(--sans);
+}
+.toggle-pill button.active {
+  background: var(--mode-accent); color: #fff; font-weight: 600;
+}
+
+/* ── LANDING ── */
+#landing {
+  min-height: 100vh; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; background: #fff; padding: 40px 20px;
+}
+.landing-logo { font-family: var(--mono); font-size: 12px; letter-spacing: 0.15em; color: var(--text-dim); margin-bottom: 40px; text-transform: uppercase; }
+.landing-title { font-size: 28px; font-weight: 600; color: var(--text); margin-bottom: 10px; text-align: center; }
+.landing-sub { font-size: 15px; color: var(--text-muted); margin-bottom: 52px; text-align: center; }
+.landing-cards { display: flex; gap: 24px; flex-wrap: wrap; justify-content: center; }
+.landing-card { border: 2px solid var(--border); border-radius: 16px; padding: 36px 40px; width: 260px; text-align: center; cursor: pointer; transition: all 0.2s; background: #fff; }
+.landing-card:hover { transform: translateY(-4px); box-shadow: 0 12px 32px rgba(0,0,0,0.09); }
+.landing-card.voos-h:hover { border-color: var(--accent-h); }
+.landing-card.voos-v:hover { border-color: var(--accent-v); }
+.landing-card .lc-icon { font-size: 44px; margin-bottom: 18px; display: block; }
+.landing-card .lc-title { font-size: 17px; font-weight: 600; margin-bottom: 8px; }
+.landing-card .lc-desc { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+.landing-card.voos-h .lc-title { color: var(--accent-h); }
+.landing-card.voos-v .lc-title { color: var(--accent-v); }
+.landing-card .lc-btn { margin-top: 20px; display: inline-block; padding: 9px 22px; border-radius: 8px; font-size: 13px; font-weight: 600; color: #fff; }
+.landing-card.voos-h .lc-btn { background: var(--accent-h); }
+.landing-card.voos-v .lc-btn { background: var(--accent-v); }
+
+/* ── APP ── */
+#app { display: none; }
+
+/* HEADER */
+header { border-bottom: 1px solid var(--border); padding: 14px 28px; display: flex; align-items: center; gap: 16px; background: #fff; position: sticky; top: 0; z-index: 100; box-shadow: 0 1px 4px rgba(0,0,0,0.05); }
+.header-mode { font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; padding: 4px 12px; border-radius: 6px; font-weight: 700; background: var(--mode-light); color: var(--mode-accent); border: 1px solid var(--mode-accent); white-space: nowrap; }
+.switch-btn { margin-left: auto; padding: 7px 16px; border-radius: 8px; border: 1.5px solid var(--border2); background: #fff; color: var(--text-muted); font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.switch-btn:hover { border-color: var(--mode-accent); color: var(--mode-accent); }
+.sticky-toggle-btn { padding: 8px 20px; border-radius: 8px; border: 1.5px solid var(--border2); background: #fff; color: var(--text-muted); font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+.sticky-toggle-btn:hover { border-color: var(--mode-accent); color: var(--mode-accent); }
+.sticky-toggle-btn.active { background: var(--mode-accent); border-color: var(--mode-accent); color: #fff; }
+#status-bar { font-family: var(--mono); font-size: 11px; color: var(--text-dim); }
+#status-bar b { color: var(--mode-accent); }
+#status-bar-mobile { display: none; font-family: var(--mono); font-size: 11px; color: var(--text-dim); padding: 0;  background: var(--surface); }
+#status-bar-mobile b { color: var(--mode-accent); }
+
+/* LAYOUT */
+.layout { display: grid; grid-template-columns: 315px 1fr; min-height: calc(100vh - 53px); }
+
+/* SIDEBAR */
+aside { border-right: 1px solid var(--border); background: var(--surface); padding: 20px 0; position: sticky; top: 53px; height: calc(100vh - 53px); overflow-y: auto; }
+.sidebar-section { padding: 0 14px 7px; border-bottom: 1px solid var(--border); margin-bottom: 0; }
+.sidebar-section:last-child { border-bottom: none; }
+.sidebar-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; color: var(--text-dim); margin-bottom: 7px; text-transform: uppercase; }
+
+/* COLLAPSIBLE */
+.collapse-header { display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; padding: 7px 0; }
+.collapse-header .sidebar-label { margin-bottom: 0; }
+.collapse-arrow { font-size: 10px; color: var(--text-dim); transition: transform 0.2s; display: inline-block; }
+.collapse-arrow.open { transform: rotate(180deg); }
+.collapse-body { overflow: hidden; max-height: 0; transition: max-height 0.3s ease; }
+.collapse-body.open { max-height: 700px; margin-top: 10px; }
+
+/* LOADING */
+/* ── AIRPLANE LOADING MODAL ─────────────────────────────────────── */
+#airplaneModal {
+  display: none;
+  position: fixed;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 88%;
+  max-width: 360px;
+  height: 35%;
+  max-height: 220px;
+  z-index: 9999;
+  background: linear-gradient(180deg, #0a1628 0%, #1a3a6b 70%, #223060 100%);
+  border-radius: 20px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.45);
+  overflow: hidden;
+  pointer-events: all;
+}
+#airplaneModal.active { display: block; }
+
+.modal-scene {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+.star {
+  position: absolute;
+  width: 2px; height: 2px;
+  border-radius: 50%;
+  background: #fff;
+  opacity: 0;
+  animation: twinkle 2s infinite;
+}
+@keyframes twinkle {
+  0%,100% { opacity: 0; } 50% { opacity: 0.85; }
+}
+
+.ground {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 28px;
+  background: #111827;
+  border-top: 1.5px solid #2d3a5a;
+}
+
+.runway-lights {
+  position: absolute;
+  bottom: 7px; left: 0; right: 0;
+  display: flex;
+  justify-content: space-evenly;
+  padding: 0 16px;
+}
+.runway-light {
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  background: #ffeb3b;
+  box-shadow: 0 0 5px #ffeb3b;
+  animation: blink-light 0.8s infinite;
+}
+.runway-light:nth-child(2) { animation-delay: 0.15s; }
+.runway-light:nth-child(3) { animation-delay: 0.30s; }
+.runway-light:nth-child(4) { animation-delay: 0.45s; }
+.runway-light:nth-child(5) { animation-delay: 0.60s; }
+.runway-light:nth-child(6) { animation-delay: 0.75s; }
+.runway-light:nth-child(7) { animation-delay: 0.90s; }
+@keyframes blink-light {
+  0%,100% { opacity: 1; } 50% { opacity: 0.15; }
+}
+
+.airplane-wrap {
+  position: absolute;
+  bottom: 26px;
+  left: -80px;
+  animation: takeoff 2.8s ease-in forwards infinite;
+  animation-delay: 0.3s;
+}
+@keyframes takeoff {
+  0%   { left: -80px; bottom: 26px; transform: rotate(0deg);   opacity: 1; }
+  38%  { left: 28%;   bottom: 28px; transform: rotate(0deg);   opacity: 1; }
+  68%  { left: 65%;   bottom: 75%;  transform: rotate(-14deg); opacity: 1; }
+  88%  { left: 105%;  bottom: 90%;  transform: rotate(-18deg); opacity: 0.6; }
+  100% { left: 120%;  bottom: 100%; transform: rotate(-18deg); opacity: 0; }
+}
+.spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border2); border-top-color: var(--mode-accent); border-radius: 50%; animation: spin 0.7s linear infinite; margin-right: 6px; vertical-align: middle; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* FILE CHIPS */
+.file-list { display: flex; flex-direction: column; gap: 5px; }
+.file-chip { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 7px 10px; font-size: 11px; display: flex; align-items: flex-start; gap: 7px; }
+.file-chip.latest { border-color: var(--mode-accent); }
+.file-chip .fc-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border2); margin-top: 3px; flex-shrink: 0; }
+.file-chip.latest .fc-dot { background: var(--mode-accent); }
+.file-chip .fc-info { flex: 1; min-width: 0; }
+.file-chip .fc-date { font-family: var(--mono); color: var(--mode-accent); font-size: 10px; }
+.file-chip .fc-name { color: var(--text-dim); font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-chip .fc-count { color: var(--text-dim); font-size: 10px; }
+.badge-latest { font-family: var(--mono); font-size: 9px; background: var(--mode-accent); color: #fff; padding: 1px 5px; border-radius: 4px; letter-spacing: 0.04em; }
+
+/* DEST FILTER */
+.city-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.city-btn { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); color: var(--text-muted); font-family: var(--mono); font-size: 11px; padding: 6px 4px; text-align: center; cursor: pointer; transition: all 0.15s; letter-spacing: 0.03em; }
+.city-btn:hover { border-color: var(--mode-accent); color: var(--mode-accent); }
+.city-btn.active { background: var(--mode-accent); border-color: var(--mode-accent); color: #fff; font-weight: 700; }
+.city-btn.all-btn { grid-column: 1 / -1; background: var(--surface2); }
+.city-btn.all-btn.active { background: var(--mode-accent); color: #fff; }
+
+/* SEARCH */
+.search-wrap { position: relative; }
+.search-wrap input { width: 100%; background: #fff; border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-family: var(--sans); font-size: 12px; padding: 8px 10px 8px 30px; outline: none; transition: border-color 0.2s; }
+.search-wrap input:focus { border-color: var(--mode-accent); }
+.search-wrap .si { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: var(--text-dim); font-size: 13px; pointer-events: none; }
+
+/* MAIN */
+main { padding: 22px 26px; overflow-x: hidden; }
+.toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
+#toolbarRow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.sort-group { display: flex; gap: 5px; flex-wrap: wrap; }
+.sort-btn { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); color: var(--text-muted); font-size: 12px; padding: 6px 12px; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+.sort-btn:hover { border-color: var(--mode-accent); color: var(--mode-accent); }
+.sort-btn.active { background: var(--mode-accent); border-color: var(--mode-accent); color: #fff; }
+.result-count { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--text-muted); }
+.result-count b { color: var(--text); }
+
+/* TABLE */
+#mapView { width:100%; height:calc(100vh - 160px); border-radius:var(--radius); border:1px solid var(--border); overflow:hidden; }
+#contentRow { display:flex; gap:16px; align-items:flex-start; }
+#listCol { flex:3; min-width:0; }
+#mapCol { flex:2; min-width:0; position:sticky; top:53px; display:none; align-self:stretch; }
+#mapCol #mapView { display:block; height:100%; min-height:400px; }
+.view-toggle-btn { padding:6px 14px; border-radius:var(--radius); border:1.5px solid var(--border2); background:#fff; color:var(--text-muted); font-size:12px; font-weight:600; cursor:pointer; transition:all 0.15s; display:none; align-items:center; gap:6px; white-space:nowrap; }
+.view-toggle-btn:hover { border-color:var(--mode-accent); color:var(--mode-accent); }
+.view-toggle-btn.map-active { background:var(--mode-accent); border-color:var(--mode-accent); color:#fff; }
+.leaflet-popup-content-wrapper { border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,0.15); }
+.leaflet-popup-content { margin:10px 14px; font-family:'DM Sans',sans-serif; }
+.map-popup-city { font-size:13px; font-weight:600; color:#1a1d27; }
+.map-popup-price { font-size:15px; font-weight:700; color:var(--accent-v,#00875a); margin-top:2px; }
+.map-popup-detail { font-size:11px; color:#5a6072; margin-top:4px; }
+.map-popup-link { display:inline-block; margin-top:8px; padding:4px 10px; border-radius:5px; background:var(--accent-v,#00875a); color:#fff; font-size:11px; font-weight:600; text-decoration:none; }
+/* TABLE */
+.table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.04); width: 90%; margin: 0 auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+thead { background: var(--surface); }
+thead th { padding: 10px 13px; text-align: left; font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; color: var(--text-muted); border-bottom: 2px solid var(--border2); white-space: nowrap; text-transform: uppercase; cursor: pointer; user-select: none; }
+thead th:hover { color: var(--mode-accent); }
+thead th.sorted { color: var(--mode-accent); }
+/* Sticky header ON */
+body.sticky-header .table-wrap { overflow-y: auto; max-height: calc(100vh - 200px); }
+body.sticky-header thead { position: sticky; top: 0; z-index: 10; }
+tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+tbody tr:last-child { border-bottom: none; }
+tbody tr:hover { background: var(--mode-light); }
+td { padding: 9px 13px; vertical-align: middle; }
+
+.badge-dest { display: inline-block; border-radius: 5px; font-family: var(--mono); font-size: 10px; padding: 2px 7px; letter-spacing: 0.06em; border: 1px solid; white-space: nowrap; }
+.badge-dest.hotel { background: var(--accent-h-light); color: var(--accent-h); border-color: rgba(0,82,204,0.2); }
+.badge-dest.voo { background: var(--accent-v-light); color: var(--accent-v); border-color: rgba(0,135,90,0.2); }
+
+.badge-file { display: inline-block; font-family: var(--mono); font-size: 10px; padding: 2px 7px; border-radius: 4px; letter-spacing: 0.03em; border: 1px solid var(--border); color: var(--text-muted); background: var(--surface2); }
+.badge-file.is-latest { background: var(--mode-light); border-color: var(--mode-accent); color: var(--mode-accent); }
+
+.price-final { font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--mode-accent); }
+.price-sub { color: var(--text-muted); font-size: 11px; font-family: var(--mono); }
+
+.badge-escala { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 500; white-space: nowrap; }
+.badge-escala.direto { background: #e3f5ee; color: #00875a; }
+.badge-escala.escala { background: #fff3e0; color: #e85d04; }
+
+.link-btn { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 3px 9px; border-radius: 4px; text-decoration: none; border: 1px solid var(--border); color: var(--text-muted); background: var(--surface2); transition: all 0.15s; white-space: nowrap; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.link-btn:hover { border-color: var(--mode-accent); color: var(--mode-accent); background: var(--mode-light); }
+.links-cell { display: flex; gap: 5px; flex-wrap: wrap; }
+
+.empty-state { text-align: center; padding: 70px 20px; color: var(--text-dim); }
+.empty-state .big { font-size: 44px; margin-bottom: 14px; }
+.empty-state p { color: var(--text-muted); font-size: 14px; line-height: 1.7; }
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+@media (max-width: 768px) {
+  .layout { grid-template-columns: 1fr; display: flex; flex-direction: column; }
+  aside { position: static; height: auto; border-right: none; border-bottom: 1px solid var(--border); order: 0; display: flex; flex-direction: column; }
+  aside #filesSection { order: 99; border-top: 1px solid var(--border); margin-top: 0; }
+  main { padding: 0; order: 1; }
+  #filesSection { border-bottom: 1px solid var(--border); }
+  #status-bar { display: none; }
+  #status-bar-mobile { display: block; }
+  body.sticky-header .table-wrap { max-height: calc(100vh - 160px); }
+  /* Mobile: mapa sempre visível, sem botão toggle */
+  .view-toggle-btn { display:none !important; }
+  #contentRow { display:block; }
+  #mapCol { position:static !important; display:block !important; width:90%; margin:0 auto 14px auto; }
+  #mapCol #mapView { display:block !important; height:350px !important; width:100%; }
+  #mapCol.mobile-map-visible { display:block !important; }
+  #mapCol.mobile-map-visible #mapView { display:block !important; height:350px !important; width:100%; }
+  #listCol .table-wrap { display:block; }
+  #listCol .table-wrap.mobile-hidden { display:none; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── AIRPLANE LOADING MODAL ───────────────────────────────────── -->
+<div id="airplaneModal" role="dialog" aria-label="Carregando">
+  <div class="modal-scene">
+    <div class="star" style="top:12%;left:10%;animation-delay:0s"></div>
+    <div class="star" style="top:8%;left:28%;animation-delay:0.4s"></div>
+    <div class="star" style="top:18%;left:50%;animation-delay:0.8s"></div>
+    <div class="star" style="top:6%;left:72%;animation-delay:0.2s"></div>
+    <div class="star" style="top:20%;left:88%;animation-delay:1s"></div>
+    <div class="star" style="top:30%;left:35%;animation-delay:0.6s"></div>
+    <div class="star" style="top:15%;left:60%;animation-delay:1.2s"></div>
+    <!-- Moon -->
+    <div style="position:absolute;top:10%;left:12%;width:20px;height:20px;border-radius:50%;background:#fff9c4;box-shadow:0 0 14px #fff9c4,0 0 4px #ffee58;opacity:0.9"></div>
+    <!-- Tower -->
+    <svg style="position:absolute;bottom:28px;right:20px;opacity:0.9" width="30" height="60" viewBox="0 0 30 60">
+      <rect x="12" y="0"  width="5"  height="40" fill="#2d3561"/>
+      <rect x="8"  y="40" width="14" height="18" fill="#2d3561"/>
+      <rect x="6"  y="36" width="18" height="5"  fill="#3a4580" rx="2"/>
+      <rect x="5"  y="52" width="20" height="3"  fill="#2d3561"/>
+      <rect x="11" y="30" width="2"  height="7"  fill="#4fc3f7"/>
+      <rect x="17" y="30" width="2"  height="7"  fill="#4fc3f7"/>
+      <rect x="11" y="41" width="2"  height="7"  fill="#4fc3f7"/>
+      <rect x="17" y="41" width="2"  height="7"  fill="#4fc3f7"/>
+      <rect x="12" y="1"  width="6"  height="1"  fill="#ef5350"/>
+    </svg>
+    <div class="airplane-wrap">
+      <svg width="68" height="26" viewBox="0 0 72 28" fill="none">
+        <ellipse cx="36" cy="14" rx="28" ry="7" fill="#eceff1"/>
+        <path d="M64 14 Q72 14 70 17 L58 17 Z" fill="#cfd8dc"/>
+        <path d="M8 14 L2 8 L6 14 L2 20 Z" fill="#90a4ae"/>
+        <path d="M30 13 L50 13 L44 22 L28 20 Z" fill="#b0bec5"/>
+        <path d="M8 13 L14 6 L18 13 Z" fill="#b0bec5"/>
+        <circle cx="52" cy="12" r="2" fill="#81d4fa" opacity="0.8"/>
+        <circle cx="45" cy="11" r="2" fill="#81d4fa" opacity="0.8"/>
+        <circle cx="38" cy="11" r="2" fill="#81d4fa" opacity="0.8"/>
+        <ellipse cx="40" cy="21" rx="5" ry="2.5" fill="#78909c"/>
+        <path d="M35 21 Q30 23 28 21" stroke="#ffcc02" stroke-width="1.5" fill="none" opacity="0.7"/>
+      </svg>
+    </div>
+    <div class="ground">
+      <div class="runway-lights">
+        <div class="runway-light"></div>
+        <div class="runway-light"></div>
+        <div class="runway-light"></div>
+        <div class="runway-light"></div>
+        <div class="runway-light"></div>
+        <div class="runway-light"></div>
+        <div class="runway-light"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- LANDING -->
+<div id="landing">
+  <div class="landing-logo">✦ Buscador de Viagens do @EmilioASL</div>
+  <div class="landing-sub">Escolha o tipo de busca para continuar</div>
+  <div class="landing-cards">
+    <div class="landing-card voos-h" onclick="enterMode('hoteis')">
+      <span class="lc-icon">🏨✈️</span>
+      <div class="lc-title">Voos e Hotéis</div>
+      <div class="lc-desc">Pacotes com preço total:<br>hospedagem + 3 passageiros</div>
+      <span class="lc-btn">Ver resultados →</span>
+    </div>
+    <div class="landing-card voos-v" onclick="enterMode('voos')">
+      <span class="lc-icon">✈️</span>
+      <div class="lc-title">Apenas Voos</div>
+      <div class="lc-desc">Somente passagens aéreas,<br>todas as datas disponíveis</div>
+      <span class="lc-btn">Ver resultados →</span>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <header>
+    <div class="header-mode" id="headerMode">—</div>
+    <div id="status-bar" style="display:none"></div>
+    <button class="switch-btn" id="switchBtn" onclick="switchMode()">⇄ <span id="switchLabel">—</span></button>
+    <button onclick="resetAllFilters()" title="Limpar todos os filtros" style="
+      width:34px;height:34px;border-radius:50%;border:1.5px solid var(--border2);
+      background:#fff;color:var(--text-muted);font-size:16px;font-weight:700;
+      cursor:pointer;display:flex;align-items:center;justify-content:center;
+      transition:all 0.15s;flex-shrink:0;
+    " onmouseover="this.style.borderColor='var(--warn)';this.style.color='var(--warn)'"
+       onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--text-muted)'">✕</button>
+  </header>
+
+  <div class="layout">
+    <aside>
+      <!-- 0a. CLASS + IDA/VOLTA TOGGLES — always visible in voos mode -->
+      <div class="sidebar-section" id="vooToggleSection" style="display:none">
+        <div class="toggle-pill" id="classToggle">
+          <button id="classBtn_ECO" onclick="setClassFilter('ECO')" class="active">Econômico</button>
+          <button id="classBtn_EXE" onclick="setClassFilter('EXE')">Executivo</button>
+        </div>
+        <div class="toggle-pill" id="idaVoltaToggle" style="margin-top:6px;display:none">
+          <button id="ivBtn_idavolta" onclick="setIdaVoltaToggle('idavolta')">Ida e Volta</button>
+          <button id="ivBtn_ida"      onclick="setIdaVoltaToggle('ida')">Apenas Ida</button>
+          <button id="ivBtn_ALL"      onclick="setIdaVoltaToggle('ALL')">Todos</button>
+        </div>
+      </div>
+
+      <!-- 0b. ORIGEM — only shown when multiple origins exist -->
+      <div class="sidebar-section" id="originFilterSection" style="display:none">
+        <div class="sidebar-label">✈️ Cidade Origem</div>
+        <div id="originGrid" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px"></div>
+      </div>
+
+      <!-- 2. FERIADOS -->
+      <div class="sidebar-section" id="feriadosSection">
+        <div class="collapse-header" onclick="toggleFeriados()">
+          <div class="sidebar-label">🗓️ Feriados - opcional</div>
+          <span class="collapse-arrow" id="feriadosArrow">▼</span>
+        </div>
+        <div id="feriadosBody" style="margin-top:10px;display:none">
+          <div style="display:flex;flex-direction:column;gap:5px" id="feriadosGrid"></div>
+        </div>
+      </div>
+
+      <!-- REGIAO: Brasil / Exterior -->
+      <div class="sidebar-section" id="regiaoSection">
+        <div class="collapse-header" onclick="toggleRegiao()">
+          <div class="sidebar-label">🌍 Região - opcional</div>
+          <span class="collapse-arrow" id="regiaoArrow">▼</span>
+        </div>
+        <div id="regiaoBody" style="display:flex;flex-direction:column;gap:5px;margin-top:10px">
+          <div id="regiaoGrid" style="display:flex;flex-direction:column;gap:5px"></div>
+        </div>
+      </div>
+
+      <!-- FILTRO IDA/VOLTA -->
+      
+
+      <!-- 3. FILTRAR DATA -->
+      <div class="sidebar-section" id="dateSection" style="display:none">
+        <div class="collapse-header" onclick="toggleDate()">
+          <div class="sidebar-label" id="dateLabel">Data de Ida - opcional</div>
+          <span class="collapse-arrow" id="dateArrow">▼</span>
+        </div>
+        <div id="dateFilterBody" style="margin-top:10px;display:none">
+          <div class="city-grid" id="monthGrid"></div>
+          <div id="dayGrid" style="margin-top:6px;display:none">
+            <div style="font-size:10px;color:var(--text-dim);font-family:var(--mono);margin-bottom:5px;letter-spacing:0.08em">DIAS</div>
+            <div class="city-grid" id="dayBtnGrid"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FILTRO DIAS -->
+      <div class="sidebar-section" id="diasFilterSection" style="display:none">
+        <div class="collapse-header" onclick="toggleDiasFilter()">
+          <div class="sidebar-label">📆 Duração (dias) - opcional</div>
+          <span class="collapse-arrow" id="diasFilterArrow">▼</span>
+        </div>
+        <div id="diasFilterBody" style="display:none">
+          <div class="city-grid" id="diasFilterGrid"></div>
+        </div>
+      </div>
+
+      <!-- BUSCA RÁPIDA -->
+      <div class="sidebar-section">
+        <div class="sidebar-label">Busca rápida</div>
+        <div class="search-wrap">
+          <span class="si">🔍</span>
+          <input type="text" id="searchInput" placeholder="país, cidade, aeroporto..." inputmode="search" onblur="if(/iPhone|iPad|iPod/.test(navigator.userAgent)){document.querySelector('meta[name=viewport]').content='width=device-width,initial-scale=1.0,maximum-scale=1.0';}">
+        </div>
+      </div>
+
+    </aside>
+
+    <main>
+      <div id="emptyState" class="empty-state">
+        <div class="big">⏳</div>
+        <p>Buscando arquivos no repositório...</p>
+      </div>
+      <div id="status-bar-mobile"></div>
+      <div id="dataSection" style="display:none">
+        <div id="contentRow" style="padding-top:8px">
+          <div id="mapCol">
+            <div id="mapView"></div>
+          </div>
+          <div id="listCol">
+            <div id="toolbarRow">
+              <button class="view-toggle-btn" id="viewToggleBtn" onclick="toggleView()">🗺️ Mapa</button>
+              <div class="sort-group" id="sortGroup"></div>
+              <div class="result-count" id="resultCount"></div>
+            </div>
+            <div class="table-wrap" id="tableWrapEl">
+              <table>
+                <thead id="tableHead"></thead>
+                <tbody id="tableBody"></tbody>
+              </table>
+            </div>
+            <!-- paginationBar injected here by JS -->
+          </div>
+        </div>
+        <!-- statsBar — arquivos/registros/destinos -->
+        <div id="statsBar" style="display:none;margin-top:14px;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);font-family:var(--mono);font-size:11px;color:var(--text-muted);flex-wrap:wrap;gap:8px;align-items:center"></div>
+        <!-- Arquivos carregados -->
+        <div id="filesSection" style="margin-top:14px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);overflow:hidden">
+          <div class="collapse-header" onclick="toggleArquivos()" style="padding:10px 14px">
+            <div class="sidebar-label" style="margin-bottom:0">Arquivos carregados</div>
+            <span class="collapse-arrow" id="collapseArrow">▼</span>
+          </div>
+          <div class="collapse-body" id="collapseBody" style="padding:0 14px">
+            <div id="loadingBox" class="loading-box" style="margin:8px 0">
+              <span class="spinner"></span>buscando CSVs...
+            </div>
+            <div class="file-list" id="fileList" style="padding-bottom:10px"></div>
+          </div>
+        </div>
+        <!-- Sticky header toggle -->
+        <div style="margin-top:14px;display:flex;justify-content:center">
+          <button class="sticky-toggle-btn" id="stickyToggleBtn" onclick="toggleStickyHeader()">
+            📌 Header Off
+          </button>
+          <button id="mapTile_dark"  onclick="setMapTile('dark')"  class="sticky-toggle-btn">🌑 Dark</button>
+          <button id="mapTile_gmaps" onclick="setMapTile('gmaps')" class="sticky-toggle-btn active">🟢 GMaps</button>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+// CONFIG
+const GITHUB_USER   = 'emilioasl';
+const GITHUB_REPO   = 'Voos_Hoteis';
+const GITHUB_BRANCH = 'main';
+const GITHUB_TOKEN  = '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';
+const GH_HEADERS    = { 'Authorization': 'token ' + GITHUB_TOKEN };
+const MAX_FILES     = 1000;
+const PATTERN_HOTEIS = '____________BUSCADOR_Hoteis_por_Data_';
+const PATTERN_VOOS   = '_compilado_Voos.csv';
+
+// STATE
+const state = {
+  mode: 'hoteis', files: [], allRows: [],
+  selectedDest: 'ALL', sortCol: '', sortAsc: true, search: '',
+  selectedMonth: 'ALL', selectedDays: [], currentPage: 0,
+  feriadoFilter: [],   // [] = todos; array de names selecionados
+  regiaoFilter: [],    // [] = todos; array de vals selecionados
+  diasFilter: [],      // [] = todos; array multi-select
+  idaVoltaFilter: 'idavolta', // 'idavolta' | 'ida' | 'ALL'
+  viewMode: 'list',      // 'list' | 'map'
+  selectedOrigin: 'ALL', // 'ALL' | código IATA da origem (SAO, FLN, GIG...)
+  classFilter: 'ECO',    // 'ECO' | 'EXE'
+  _originManuallyReset: false, // true após resetAllFilters — impede auto-default SAO
+};
+
+// ── UTILS ──────────────────────────────────────────────────────────────────
+
+// "2026-03-16 14:19" ou "2026-03-16" → timestamp para ordenação correta
+function dateToTs(str) {
+  if (!str || str === 'data desconhecida') return 0;
+  const s = str.trim().replace(' ', 'T');
+  const fixed = /T\d{2}:\d{2}$/.test(s) ? s + ':00' : s;
+  const d = new Date(fixed);
+  return isNaN(d) ? 0 : d.getTime();
+}
+
+// "2026-05-16" → timestamp
+function isoToTs(str) {
+  if (!str) return 0;
+  const d = new Date(str.trim());
+  return isNaN(d) ? 0 : d.getTime();
+}
+
+// Limpa e converte string de preço para número
+// "3.000" → 3000 | "9,802" → 9802 | "265" → 265
+function parsePrice(str) {
+  if (!str) return 0;
+  let s = String(str).replace(/"/g, '').trim();
+  // pt-BR milhar: "3.000,50" → remove ponto, vírgula vira ponto
+  if (s.includes('.') && s.includes(',')) {
+    s = s.replace(/\./g, '').replace(',', '.');
+  } else if (s.includes(',')) {
+    // "9,802" = milhar americano (9802) — remove vírgula
+    s = s.replace(/,/g, '');
+  }
+  return parseFloat(s) || 0;
+}
+
+// ── DATE UTILS ────────────────────────────────────────────────────────────
+const MESES = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+
+// ── SEARCH ALIASES (PT ↔ EN) ──────────────────────────────────────────────
+const SEARCH_ALIASES = {
+  'accra': ['acra'],
+  'acra': ['accra'],
+  'alemanha': ['germany'],
+  'algeria': ['argelia', 'argélia'],
+  'ama': ['amman'],
+  'amman': ['ama', 'amã'],
+  'amsterdam': ['amsterdã'],
+  'amsterdã': ['amsterdam'],
+  'amã': ['amman'],
+  'ancara': ['ankara'],
+  'ankara': ['ancara'],
+  'antalia': ['antalya'],
+  'antalya': ['antalia', 'antália'],
+  'antália': ['antalya'],
+  'argelia': ['algeria'],
+  'argélia': ['algeria'],
+  'assua': ['aswan'],
+  'assuncao': ['asuncion'],
+  'assunção': ['asuncion'],
+  'asuncion': ['assuncao', 'assunção'],
+  'aswan': ['assua', 'assuã'],
+  'assuã': ['aswan'],
+  'athens': ['atenas'],
+  'atenas': ['athens'],
+  'austria': ['áustria'],
+  'áustria': ['austria'],
+  'bagda': ['baghdad'],
+  'bagdá': ['baghdad'],
+  'baghdad': ['bagda', 'bagdá'],
+  'baku': ['baku'],
+  'bangkok': ['bangcoc'],
+  'bangcoc': ['bangkok'],
+  'barcelona': ['barcelona'],
+  'basel': ['basileia'],
+  'basileia': ['basel'],
+  'beijing': ['pequim'],
+  'beirut': ['beirute'],
+  'beirute': ['beirut'],
+  'belem': ['belém'],
+  'belém': ['belem'],
+  'belgica': ['belgium'],
+  'belgium': ['belgica', 'bélgica'],
+  'bélgica': ['belgium'],
+  'berlin': ['berlim'],
+  'berlim': ['berlin'],
+  'bogota': ['bogotá'],
+  'bogotá': ['bogota'],
+  'bologna': ['bolonha'],
+  'bolonha': ['bologna'],
+  'bombaim': ['mumbai'],
+  'bordeaux': ['bordéus'],
+  'bordeus': ['bordeaux'],
+  'bordéus': ['bordeaux'],
+  'bora bora': ['bora bora'],
+  'brasilia': ['brasília'],
+  'brasília': ['brasilia'],
+  'brussels': ['bruxelas'],
+  'bruxelas': ['brussels'],
+  'bucharest': ['bucareste'],
+  'bucareste': ['bucharest'],
+  'budapest': ['budapeste'],
+  'budapeste': ['budapest'],
+  'bulgaria': ['bulgária'],
+  'bulgária': ['bulgaria'],
+  'calcuta': ['kolkata'],
+  'calcutá': ['kolkata'],
+  'canada': ['canadá'],
+  'canadá': ['canada'],
+  'cancun': ['cancún'],
+  'cancún': ['cancun'],
+  'cantao': ['guangzhou'],
+  'cantão': ['guangzhou'],
+  'cape town': ['cidade do cabo'],
+  'carachi': ['karachi'],
+  'cayenne': ['caiena'],
+  'caiena': ['cayenne'],
+  'chennai': ['chennai'],
+  'chicago': ['chicago'],
+  'chipre': ['cyprus'],
+  'cidade do cabo': ['cape town'],
+  'cidade do mexico': ['mexico city'],
+  'cidade do méxico': ['mexico city'],
+  'cidade da guatemala': ['guatemala city'],
+  'cidade do panama': ['panama city'],
+  'cidade do panamá': ['panama city'],
+  'cologne': ['colônia'],
+  'colombo': ['colombo'],
+  'colonia': ['cologne'],
+  'colônia': ['cologne'],
+  'copenhagen': ['copenhague'],
+  'copenhague': ['copenhagen'],
+  'coreia do sul': ['south korea'],
+  'coréia do sul': ['south korea'],
+  'croatia': ['croácia'],
+  'croacia': ['croatia'],
+  'croácia': ['croatia'],
+  'cuiaba': ['cuiabá'],
+  'cuiabá': ['cuiaba'],
+  'cyprus': ['chipre'],
+  'dar es salaam': ['dar es salaam'],
+  'denmark': ['dinamarca'],
+  'dhaka': ['daca'],
+  'daca': ['dhaka'],
+  'dinamarca': ['denmark'],
+  'doha': ['doha'],
+  'dubai': ['dubai'],
+  'dusseldorf': ['düsseldorf'],
+  'düsseldorf': ['dusseldorf'],
+  'easter island': ['ilha de páscoa', 'ilha de pascoa'],
+  'egypt': ['egito'],
+  'egito': ['egypt'],
+  'emirados arabes': ['united arab emirates'],
+  'emirados árabes': ['united arab emirates'],
+  'eslovaquia': ['slovakia'],
+  'eslováquia': ['slovakia'],
+  'eslovenia': ['slovenia'],
+  'eslovênia': ['slovenia'],
+  'espanha': ['spain'],
+  'estonia': ['estônia'],
+  'estônia': ['estonia'],
+  'etiopia': ['ethiopia'],
+  'etiópia': ['ethiopia'],
+  'ethiopia': ['etiopia', 'etiópia'],
+  'estrasburgo': ['strasbourg'],
+  'filadelfia': ['philadelphia'],
+  'filadélfia': ['philadelphia'],
+  'filipinas': ['philippines'],
+  'finland': ['finlândia'],
+  'finlandia': ['finland'],
+  'finlândia': ['finland'],
+  'florence': ['florença'],
+  'florenca': ['florence'],
+  'florença': ['florence'],
+  'florianopolis': ['florianópolis'],
+  'florianópolis': ['florianopolis'],
+  'foz do iguacu': ['foz do iguaçu'],
+  'foz do iguaçu': ['foz do iguacu'],
+  'franca': ['france'],
+  'france': ['franca', 'frança'],
+  'frankfurt': ['frankfurt am main'],
+  'frankfurt am main': ['frankfurt'],
+  'frança': ['france'],
+  'geneva': ['genebra'],
+  'genebra': ['geneva'],
+  'germany': ['alemanha'],
+  'goiania': ['goiânia'],
+  'goiânia': ['goiania'],
+  'gothenburg': ['gotemburgo'],
+  'gotemburgo': ['gothenburg'],
+  'greece': ['grécia'],
+  'grecia': ['grécia'],
+  'grécia': ['greece'],
+  'guangzhou': ['cantao', 'cantão'],
+  'guatemala city': ['cidade da guatemala'],
+  'hamburg': ['hamburgo'],
+  'hamburgo': ['hamburg'],
+  'hanoi': ['hanói'],
+  'hanói': ['hanoi'],
+  'havana': ['havana'],
+  'helsinki': ['helsinque'],
+  'helsinque': ['helsinki'],
+  'ho chi minh city': ['cidade de ho chi minh'],
+  'cidade de ho chi minh': ['ho chi minh city'],
+  'holanda': ['netherlands'],
+  'hong kong': ['hong kong'],
+  'hungria': ['hungary'],
+  'hungary': ['hungria'],
+  'iceland': ['islândia'],
+  'india': ['índia'],
+  'indonesia': ['indonésia'],
+  'indonésia': ['indonesia'],
+  'índia': ['india'],
+  'ireland': ['irlanda'],
+  'irlanda': ['ireland'],
+  'islamabade': ['islamabad'],
+  'islamabad': ['islamabade'],
+  'islândia': ['iceland'],
+  'istanbul': ['istambul'],
+  'istambul': ['istanbul'],
+  'italy': ['itália'],
+  'itália': ['italy'],
+  'jacarta': ['jakarta'],
+  'jakarta': ['jacarta'],
+  'japan': ['japão'],
+  'japao': ['japan'],
+  'japão': ['japan'],
+  'jeda': ['jeddah'],
+  'jedá': ['jeddah'],
+  'jeddah': ['jeda', 'jedá'],
+  'johannesburg': ['johanesburgo', 'johannesburgo'],
+  'johanesburgo': ['johannesburg'],
+  'joao pessoa': ['joão pessoa'],
+  'joão pessoa': ['joao pessoa'],
+  'jordan': ['jordânia'],
+  'jordania': ['jordan'],
+  'jordânia': ['jordan'],
+  'karachi': ['carachi'],
+  'kathmandu': ['katmandu'],
+  'katmandu': ['kathmandu'],
+  'kingston': ['kingston'],
+  'kolkata': ['calcuta', 'calcutá'],
+  'kuala lumpur': ['território federal de kuala lumpur'],
+  'lagos': ['lagos'],
+  'lahore': ['laore'],
+  'laore': ['lahore'],
+  'las vegas': ['las vegas'],
+  'la paz': ['la paz'],
+  'leipzig': ['lípsia'],
+  'lipsia': ['leipzig'],
+  'lípsia': ['leipzig'],
+  'lisbon': ['lisboa'],
+  'lisboa': ['lisbon'],
+  'london': ['londres'],
+  'longyearbyen': ['longyearbyen'],
+  'londres': ['london'],
+  'los angeles': ['los angeles'],
+  'luanda': ['luanda'],
+  'luang prabang': ['luang prabang'],
+  'lugano': ['lugano'],
+  'luxemburgo': ['luxembourg'],
+  'luxembourg': ['luxemburgo'],
+  'lyon': ['lyon'],
+  'maceio': ['maceió'],
+  'maceió': ['maceio'],
+  'macapa': ['macapá'],
+  'macapá': ['macapa'],
+  'madrid': ['madri', 'madrid'],
+  'madri': ['madrid'],
+  'male': ['malé'],
+  'malé': ['male'],
+  'manila': ['manila'],
+  'marseille': ['marselha'],
+  'marselha': ['marseille'],
+  'marrocos': ['morocco'],
+  'mexico': ['méxico'],
+  'mexico city': ['cidade do méxico', 'cidade do mexico'],
+  'méxico': ['mexico'],
+  'miami': ['miami'],
+  'milan': ['milão'],
+  'milao': ['milan'],
+  'milão': ['milan'],
+  'minneapolis': ['mineápolis'],
+  'mineápolis': ['minneapolis'],
+  'mombasa': ['mombaça'],
+  'mombaça': ['mombasa'],
+  'mombaca': ['mombasa'],
+  'montevideo': ['montevidéu'],
+  'montevidéu': ['montevideo'],
+  'morocco': ['marrocos'],
+  'moscow': ['moscou'],
+  'moscou': ['moscow'],
+  'mumbai': ['bombaim'],
+  'munich': ['munique'],
+  'munique': ['munich'],
+  'muscat': ['mascate'],
+  'mascate': ['muscat'],
+  'nairóbi': ['nairobi'],
+  'nairobi': ['nairóbi'],
+  'nanquim': ['nanjing'],
+  'nanjing': ['nanquim'],
+  'naples': ['nápoles'],
+  'napoles': ['naples'],
+  'nápoles': ['naples'],
+  'nassau': ['nassau'],
+  'netherlands': ['holanda', 'países baixos', 'paises baixos'],
+  'new delhi': ['nova delhi', 'nova délhi'],
+  'new york': ['nova iorque'],
+  'new orleans': ['nova orleans'],
+  'new zealand': ['nova zelândia', 'nova zelandia'],
+  'nice': ['nice'],
+  'norway': ['noruega'],
+  'noruega': ['norway'],
+  'nova delhi': ['new delhi'],
+  'nova délhi': ['new delhi'],
+  'nova iorque': ['new york'],
+  'nova orleans': ['new orleans'],
+  'nova zelândia': ['new zealand'],
+  'nova zelandia': ['new zealand'],
+  'noumea': ['nouméa'],
+  'nouméa': ['noumea'],
+  'nuremberg': ['nuremberga'],
+  'nuremberga': ['nuremberg'],
+  'oslo': ['oslo'],
+  'paises baixos': ['netherlands'],
+  'países baixos': ['netherlands'],
+  'pakistan': ['paquistão'],
+  'panama city': ['cidade do panamá', 'cidade do panama'],
+  'paquistao': ['pakistan'],
+  'paquistão': ['pakistan'],
+  'paris': ['paris'],
+  'pequim': ['beijing'],
+  'perth': ['perth'],
+  'philadelphia': ['filadelfia', 'filadélfia'],
+  'philippines': ['filipinas'],
+  'phnom penh': ['phnom penh'],
+  'pittsburgh': ['pitsburgo'],
+  'pitsburgo': ['pittsburgh'],
+  'poland': ['polônia'],
+  'polonia': ['poland'],
+  'polônia': ['poland'],
+  'prague': ['praga'],
+  'praga': ['prague'],
+  'punta cana': ['punta cana'],
+  'reykjavik': ['reykjavik'],
+  'riade': ['riyadh'],
+  'ribeirao preto': ['ribeirão preto'],
+  'ribeirão preto': ['ribeirao preto'],
+  'rhodes': ['rodes'],
+  'rodes': ['rhodes'],
+  'riyadh': ['riade'],
+  'rome': ['roma'],
+  'romania': ['romênia'],
+  'romenia': ['romania'],
+  'romênia': ['romania'],
+  'roma': ['rome'],
+  'rotterdam': ['roterdão'],
+  'roterdão': ['rotterdam'],
+  'russia': ['rússia'],
+  'rússia': ['russia'],
+  'saint petersburg': ['são petersburgo'],
+  'santiago': ['santiago'],
+  'santo domingo': ['santo domingo'],
+  'sao francisco': ['são francisco'],
+  'sao luis': ['são luís'],
+  'sao paulo': ['são paulo'],
+  'sao petersburgo': ['saint petersburg'],
+  'são francisco': ['san francisco'],
+  'são luís': ['sao luis'],
+  'são paulo': ['sao paulo'],
+  'são petersburgo': ['saint petersburg'],
+  'san francisco': ['são francisco'],
+  'seville': ['sevilha'],
+  'sevilha': ['seville'],
+  'seul': ['seoul'],
+  'seoul': ['seul'],
+  'shanghai': ['xangai'],
+  'singapore': ['singapura'],
+  'singapura': ['singapore'],
+  'slovakia': ['eslovaquia', 'eslováquia'],
+  'slovenia': ['eslovenia', 'eslovênia'],
+  'sofia': ['sófia'],
+  'sófia': ['sofia'],
+  'south korea': ['coreia do sul', 'coréia do sul'],
+  'spain': ['espanha'],
+  'stockholm': ['estocolmo'],
+  'estocolmo': ['stockholm'],
+  'strasbourg': ['estrasburgo'],
+  'suecia': ['sweden'],
+  'suécia': ['sweden'],
+  'suica': ['switzerland'],
+  'suíça': ['switzerland'],
+  'sweden': ['suecia', 'suécia'],
+  'switzerland': ['suica', 'suíça'],
+  'sydney': ['sydney'],
+  'tahiti': ['taiti'],
+  'taiti': ['tahiti'],
+  'tailandia': ['thailand'],
+  'tailândia': ['thailand'],
+  'taipei': ['taipé'],
+  'taipé': ['taipei'],
+  'tashkent': ['toshkent'],
+  'tbilisi': ['tiblissi'],
+  'tehran': ['teerã'],
+  'teerã': ['tehran'],
+  'territory federal de kuala lumpur': ['kuala lumpur'],
+  'território federal de kuala lumpur': ['kuala lumpur'],
+  'thailand': ['tailandia', 'tailândia'],
+  'thessaloniki': ['tessalônica'],
+  'tessalonica': ['thessaloniki'],
+  'tessalônica': ['thessaloniki'],
+  'tiblissi': ['tbilisi'],
+  'tokyo': ['tóquio'],
+  'toquio': ['tokyo'],
+  'tóquio': ['tokyo'],
+  'toshkent': ['tashkent'],
+  'toulouse': ['toulouse'],
+  'turin': ['turim'],
+  'turim': ['turin'],
+  'turkey': ['turquia'],
+  'turquia': ['turkey'],
+  'uberlandia': ['uberlândia'],
+  'uberlândia': ['uberlandia'],
+  'united arab emirates': ['emirados arabes', 'emirados árabes'],
+  'united kingdom': ['reino unido'],
+  'reino unido': ['united kingdom'],
+  'ulaanbaatar': ['ulan bator'],
+  'ulan bator': ['ulaanbaatar'],
+  'valencia': ['valência'],
+  'valência': ['valencia'],
+  'venice': ['veneza'],
+  'veneza': ['venice'],
+  'vienna': ['viena'],
+  'viena': ['vienna'],
+  'vientiane': ['vienciana'],
+  'vienciana': ['vientiane'],
+  'vitoria': ['vitória'],
+  'vitória': ['vitoria'],
+  'warsaw': ['varsóvia'],
+  'varsovia': ['warsaw'],
+  'varsóvia': ['warsaw'],
+  'washington': ['washington'],
+  'xangai': ['shanghai'],
+  'yangon': ['yangon', 'rangum'],
+  'rangum': ['yangon'],
+  'yerevan': ['ierevan'],
+  'ierevan': ['yerevan'],
+     'zurich': ['zurique'],
+     'zurique': ['zurich'],
+     'brazil': ['brasil'],
+     'brasil': ['brazil'],
+     'united states': ['estados unidos'],
+     'estados unidos': ['united states'],
+};
+
+// ── FERIADOS ──────────────────────────────────────────────────────────────
+// { name: '🟡 Abril (17-21) Tiradentes (Ter)',     ranges: [{sd:17,sm:4,ed:21,em:4},{sd:18,sm:4,ed:21,em:4}] },
+const FERIADOS = [
+  { name: '🟡 Abril (30-3) Trabalho (Sex)',       ranges: [{sd:30,sm:4,ed:3,em:5},{sd:1,sm:5,ed:3,em:5}] },
+  { name: '🟡 Junho (3-7) Corpus C (Qui)',         ranges: [{sd:3,sm:6,ed:7,em:6},{sd:4,sm:6,ed:7,em:6}] },
+  { name: '🟡 Setembro (4-7) Indep. (Seg)',  ranges: [{sd:4,sm:9,ed:7,em:9},{sd:5,sm:9,ed:7,em:9}] },
+  { name: '🟡 Outubro (9-12) Aparecida (Seg)',      ranges: [{sd:9,sm:10,ed:12,em:10},{sd:10,sm:10,ed:12,em:10}] },
+  { name: '🟡 Outubro (30-2) Finados (Seg)',        ranges: [{sd:30,sm:10,ed:2,em:11},{sd:31,sm:10,ed:2,em:11}] },
+  { name: '🟡 Novembro (19-22) Negros (Sex)',         ranges: [{sd:19,sm:11,ed:22,em:11},{sd:20,sm:11,ed:22,em:11}] },
+  { name: '🟡 Julho (8-12) 9 Julho (Qui)',           ranges: [{sd:8,sm:7,ed:12,em:11},{sd:9,sm:7,ed:12,em:11}] },
+  { name: '🎄 Dezembro Natal/Ano Novo',       ranges: [{sd:18,sm:12,ed:3,em:1},{sd:19,sm:12,ed:3,em:1},{sd:20,sm:12,ed:3,em:1}] },
+  { name: '🎂 2027 Janeiro (22-25) Niver SP (Sex)',      ranges: [{sd:20,sm:12,ed:3,em:1},{sd:22,sm:1,ed:25,em:1}] },
+  { name: '🎭 2027 Fevereiro (5-14) Carna Inteiro',    voltaMin:{d:11,m:2}, ranges: [{sd:5,sm:2,ed:14,em:2},{sd:6,sm:2,ed:14,em:2},{sd:7,sm:2,ed:14,em:2}] },
+  { name: '🎭 2027 Fevereiro (5-10) Carna Metade', voltaMax:{d:10,m:2}, ranges: [{sd:5,sm:2,ed:10,em:2},{sd:6,sm:2,ed:10,em:2}] },
+];
+
+function midnightOf(d) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function dateInFeriado(date, feriado) {
+  const d = midnightOf(date);
+  const years = [d.getFullYear() - 1, d.getFullYear(), d.getFullYear() + 1];
+  for (const r of feriado.ranges) {
+    for (const baseYear of years) {
+      const start = new Date(baseYear, r.sm - 1, r.sd);
+      const endYear = r.em < r.sm ? baseYear + 1 : baseYear;
+      const end = new Date(endYear, r.em - 1, r.ed);
+      if (d >= start && d <= end) return true;
+    }
+  }
+  return false;
+}
+const MONTH_MAP = {
+  jan:1,jann:1, fev:2,fevv:2, mar:3,marr:3, abr:4,abrr:4, mai:5,maii:5,
+  jun:6,junn:6, jul:7,jull:7, ago:8,agoo:8,
+  set:9,sett:9, out:10,outt:10, nov:11,novv:11, dez:12,dezz:12,
+  // English abbreviations — full set (jan/mar/jun/jul/nov/dec were missing)
+  feb:2, apr:4, may:5, aug:8, sep:9, oct:10,
+  mar:3, jun:6, jul:7, nov:11, dec:12,
+};
+
+// "02/abr/2026" or ISO "2026-04-02" → "02/abr/2026"
+function fmtDate(str) {
+  if (!str || str === '-' || str === 'Unknown') return str || '-';
+  str = String(str).trim();
+  // already in target format: 02/jan/2027
+  if (/^\d{2}\/[a-z]{3}\/\d{4}$/i.test(str)) return str;
+  // ISO date: 2026-07-18 or 2026-07-18T...
+  if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+    const d = new Date(str.substring(0,10) + 'T12:00:00');
+    if (!isNaN(d)) return `${String(d.getDate()).padStart(2,'0')}/${MESES[d.getMonth()]}/${d.getFullYear()}`;
+  }
+  // dd/mm/yyyy: 18/07/2026
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(str)) {
+    const [dd,mm,yyyy] = str.split('/');
+    const d = new Date(`${yyyy}-${mm}-${dd}T12:00:00`);
+    if (!isNaN(d)) return `${dd}/${MESES[d.getMonth()]}/${yyyy}`;
+  }
+  // dd-mm-yy or dd-mm-yyyy: 19-07-26 or 19-07-2026
+  if (/^\d{2}-\d{2}-\d{2,4}$/.test(str)) {
+    const [dd,mm,yy] = str.split('-');
+    let yyyy = parseInt(yy); if (yyyy < 100) yyyy += 2000;
+    const d = new Date(`${yyyy}-${mm}-${dd}T12:00:00`);
+    if (!isNaN(d)) return `${dd}/${MESES[d.getMonth()]}/${yyyy}`;
+  }
+  // dd-Mmm-yy or dd-Mmm-yyyy: 12-Dec-26, 17-Apr-26, 03-Jan-2027
+  if (/^\d{1,2}-[A-Za-z]{3,4}-\d{2,4}$/.test(str)) {
+    const parts = str.split('-');
+    const dd  = String(parseInt(parts[0])).padStart(2,'0');
+    const mon = parts[1].toLowerCase().substring(0,3);
+    let yyyy  = parseInt(parts[2]); if (yyyy < 100) yyyy += 2000;
+    const EN_MESES = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+    const PT_MESES = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+    let idx = EN_MESES.indexOf(mon);
+    if (idx < 0) idx = PT_MESES.indexOf(mon);
+    if (idx >= 0) return `${dd}/${MESES[idx]}/${yyyy}`;
+  }
+  // dd/mes-abr/yyyy: 18/jul/2026 (already good) or 18/07/26
+  if (/^\d{2}\/\d{2}\/\d{2}$/.test(str)) {
+    const [dd,mm,yy] = str.split('/');
+    const yyyy = 2000 + parseInt(yy);
+    const d = new Date(`${yyyy}-${mm}-${dd}T12:00:00`);
+    if (!isNaN(d)) return `${dd}/${MESES[d.getMonth()]}/${yyyy}`;
+  }
+  return str;
+}
+
+// "2abr5abr" → { ida: "02/abr/2026", volta: "05/abr/2026" }
+function parseGoogleDate(raw) {
+  if (!raw || raw === '-' || raw === 'Unknown') return { ida: raw || '-', volta: '' };
+  raw = String(raw).trim();
+
+  // Already ISO → just format, no volta
+  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return { ida: fmtDate(raw), volta: '' };
+
+  // Extract all (digits + letters) pairs
+  const pat = /(\d+)([a-záéíóúãõâêôç]+)/gi;
+  const parts = [];
+  let m;
+  while ((m = pat.exec(raw.toLowerCase())) !== null) {
+    const day = parseInt(m[1]);
+    const monRaw = m[2].toLowerCase();
+    let monthNum = MONTH_MAP[monRaw];
+    if (!monthNum) {
+      // fuzzy: try first 3 chars
+      for (const [k,v] of Object.entries(MONTH_MAP)) {
+        if (monRaw.startsWith(k.substring(0,3))) { monthNum = v; break; }
+      }
+    }
+    if (monthNum) parts.push({ day, mon: MESES[monthNum-1], monthNum });
+  }
+
+  if (parts.length === 0) return { ida: raw, volta: '' };
+
+  const today = new Date();
+  const getYear = (mn) => mn >= today.getMonth()+1 ? today.getFullYear() : today.getFullYear()+1;
+
+  const fmt = (p) => `${String(p.day).padStart(2,'0')}/${p.mon}/${getYear(p.monthNum)}`;
+
+  return {
+    ida:   fmt(parts[0]),
+    volta: parts.length >= 2 ? fmt(parts[parts.length-1]) : ''
+  };
+}
+
+const PAGE_SIZE = window.innerWidth <= 768 ? 10 : 16;
+
+// Número → string formatada: 3000 → "3.000"
+function fmtN(val) {
+  return val.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+}
+
+// ── LANDING ────────────────────────────────────────────────────────────────
+function enterMode(mode) {
+  state.mode = mode;
+  state.selectedMonth = 'ALL'; state.selectedDays = []; state.currentPage = 0;
+  state.feriadoFilter = [];
+  state.regiaoFilter = [];
+  state.diasFilter = [];
+  state.idaVoltaFilter = 'idavolta';
+  state.viewMode = 'list';
+  state.classFilter = mode === 'hoteis' ? 'ALL' : 'ECO';
+  state._originManuallyReset = false; // allow auto-default SAO on fresh load
+  document.getElementById('landing').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.body.className = mode === 'voos' ? 'mode-voos' : '';
+  updateHeader();
+  requestAnimationFrame(_updateToggleVisibility); // sync after DOM paint
+  loadFromGitHub();
+}
+
+function switchMode() {
+  const m = state.mode === 'hoteis' ? 'voos' : 'hoteis';
+  state.mode = m; state.files = []; state.allRows = [];
+  state.selectedDest = 'ALL'; state.search = '';
+  state.selectedMonth = 'ALL'; state.selectedDays = []; state.currentPage = 0;
+  state.feriadoFilter = [];
+  state.regiaoFilter = [];
+  state.diasFilter = [];
+  state.idaVoltaFilter = 'idavolta';
+  state.viewMode = 'list';
+  state.selectedOrigin = 'ALL';
+  state._originManuallyReset = false; // allow auto-default SAO on fresh mode switch
+  state.classFilter = m === 'hoteis' ? 'ALL' : 'ECO';
+  // Reset mobile toggle button
+  const btn = document.getElementById('viewToggleBtn');
+  if (btn) { btn.textContent = '🗺️ Mapa'; btn.classList.remove('map-active'); }
+  // Reset mobile list/map visibility
+  const tw = document.getElementById('tableWrapEl');
+  const mc = document.getElementById('mapCol');
+  if (tw) tw.classList.remove('mobile-hidden');
+  if (mc) mc.classList.remove('mobile-map-visible');
+  // Hide desktop map until new data loads
+  hideDesktopMap();
+  document.getElementById('searchInput').value = '';
+  document.body.className = m === 'voos' ? 'mode-voos' : '';
+  updateHeader(); showLoading(); loadFromGitHub();
+}
+
+function updateHeader() {
+  const isH = state.mode === 'hoteis';
+  document.getElementById('headerMode').textContent = isH ? '🏨✈️  Voos e Hotéis' : '✈️  Apenas Voos';
+  document.getElementById('switchLabel').textContent = isH ? 'Apenas Voos' : 'Voos e Hotéis';
+  const si = document.getElementById('searchInput');
+  if (si) si.placeholder = isH ? 'país, cidade, aeroporto, hotel...' : 'país, cidade, aeroporto...';
+}
+
+// ── COLLAPSE ───────────────────────────────────────────────────────────────
+let arquivosOpen = false;
+function toggleArquivos() {
+  arquivosOpen = !arquivosOpen;
+  document.getElementById('collapseBody').classList.toggle('open', arquivosOpen);
+  document.getElementById('collapseArrow').classList.toggle('open', arquivosOpen);
+}
+
+// ── GITHUB API ─────────────────────────────────────────────────────────────
+async function loadFromGitHub() {
+  showLoading();
+  try {
+    const res = await fetch(`https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/git/trees/${GITHUB_BRANCH}?recursive=1`, { headers: GH_HEADERS });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+
+    const pat = state.mode === 'hoteis' ? PATTERN_HOTEIS : PATTERN_VOOS;
+    let files = data.tree
+      .filter(f => {
+        if (f.type !== 'blob' || !f.path.includes(pat) || !f.path.endsWith('.csv')) return false;
+        // classFilter: ECO/EXE in filename — only applies to voos mode
+        if (state.mode === 'voos' && state.classFilter !== 'ALL') {
+          const name = f.path.split('/').pop();
+          if (!name.includes('_' + state.classFilter + '_')) return false;
+        }
+        return true;
+      })
+      .map(f => ({ path: f.path, name: f.path.split('/').pop() }));
+
+    // Ordena pelo nome (YYYY-MM-DD está embutido), pega os mais recentes
+    files.sort((a, b) => a.name.localeCompare(b.name));
+    if (files.length > MAX_FILES) files = files.slice(-MAX_FILES);
+    // Mais recente = último da lista ordenada
+    files.forEach((f, i) => { f.isLatest = i === files.length - 1; });
+
+    // ── Em modo hoteis: também carrega CSVs de voos (ida+volta, ECO) para join ──
+    let vooFilesForJoin = [];
+    if (state.mode === 'hoteis') {
+      vooFilesForJoin = data.tree
+        .filter(f => {
+          if (f.type !== 'blob' || !f.path.includes(PATTERN_VOOS) || !f.path.endsWith('.csv')) return false;
+          const name = f.path.split('/').pop();
+          if (name.includes('_OW_')) return false;        // exclui one-way
+          if (!name.includes('_ECO_')) return false;      // só ECO no pacote
+          return true;
+        })
+        .map(f => ({ path: f.path, name: f.path.split('/').pop() }));
+      vooFilesForJoin.sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    // Carrega todos os arquivos
+    const filesToLoad = files;
+
+    state.files = []; state.allRows = [];
+    for (const f of filesToLoad) {
+      const rawUrl = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${GITHUB_BRANCH}/${f.path}`;
+      const text = await (await fetch(rawUrl, { headers: GH_HEADERS })).text();
+      let rows = parseCSV(text);
+
+      // Remove linhas com cidade desconhecida ou vazia
+      rows = rows.filter(row => {
+        const cidade = (row['CIDADE'] || row['City Name'] || '').trim().toLowerCase();
+        const para   = (row['PARA']   || row['City']      || '').trim().toLowerCase();
+        return cidade !== 'unknown' && cidade !== '' && para !== '' && para !== '-';
+      });
+
+      const date = extractDate(f.name);
+      const dateTs = dateToTs(date);
+      const isOW = f.name.includes('_OW_'); // One-way file: ignore VOLTA column
+      state.files.push({ name: f.name, date, dateTs, isLatest: f.isLatest, count: rows.length });
+      rows.forEach(row => {
+        // For hoteis mode: compute Checkout_Date from Checkin_Date + # Days
+        if (state.mode === 'hoteis' && row['Checkin_Date']) {
+          // Normaliza Checkin_Date: aceita "09-05-26" (DD-MM-YY) e "2026-05-09" (ISO)
+          const _rawCI = String(row['Checkin_Date']).trim();
+          const _parts = _rawCI.match(/^(\d{2})-(\d{2})-(\d{2,4})$/);
+          if (_parts) {
+            let yr = parseInt(_parts[3]); if (yr < 100) yr += 2000;
+            row['Checkin_Date'] = yr + '-' + _parts[2] + '-' + _parts[1];
+          }
+          if (!row['Checkout_Date']) {
+            const days = parseInt(row['# Days'] || 0);
+            if (days > 0) {
+              const d = new Date(row['Checkin_Date'] + 'T12:00:00');
+              d.setDate(d.getDate() + days);
+              row['Checkout_Date'] = d.toISOString().substring(0, 10);
+            }
+            row['_dias'] = days || '';
+          }
+        }
+        // Parse DATA_DE_IDA into separate ida/volta for voos mode
+        if (state.mode === 'voos' && row['DATA_DE_IDA']) {
+          // Support both formats:
+          // Old: DATA_DE_IDA="17abr21abr" (ida+volta combined), VOLTA="Unknown"
+          // New: DATA_DE_IDA="30-Apr-26", VOLTA="03-May-26" (already separated)
+          let rawIda   = row['DATA_DE_IDA'] || '';
+          let rawVolta = isOW ? '' : (row['VOLTA'] || '');
+          if (rawVolta.toLowerCase() === 'unknown') rawVolta = '';
+
+          // Detect old combined format by splitting — if split gives two parts, use them
+          const [splitIda, splitVolta] = splitIdaVolta(rawIda);
+          if (splitVolta && splitVolta !== rawIda && splitVolta !== '') {
+            rawIda   = splitIda;
+            rawVolta = splitVolta;
+          }
+
+          const idaISO = partToISO(rawIda);
+          let voltaISO = '';
+          if (!isOW && rawVolta) {
+            const idaYear  = idaISO ? parseInt(idaISO.split('-')[0]) : new Date().getFullYear();
+            const idaMon   = idaISO ? parseInt(idaISO.split('-')[1]) : 1;
+            const vParsed  = partToISO(rawVolta);
+            if (vParsed && vParsed.length >= 7) {
+              const vMon = parseInt(vParsed.split('-')[1]);
+              if (/^\d{1,2}-[A-Za-z]{2,4}-\d{2,4}$/.test(rawVolta)) {
+                voltaISO = vParsed;
+              } else {
+                const voltaYear = (vMon < idaMon) ? idaYear + 1 : idaYear;
+                voltaISO = partToISO(rawVolta, voltaYear);
+              }
+            }
+          }
+          row['DATA_DE_IDA'] = idaISO;
+          row['DATA_VOLTA']  = voltaISO;
+          // Clean ESCALA — strip duration that leaked via newline ("2 paradas\n41h 25 min" → "2 paradas")
+          if (row['ESCALA']) row['ESCALA'] = String(row['ESCALA']).split('\n')[0].trim();
+          const _url = row['URL'] || '';
+          if (_url.includes('latamairlines.com') && _url.includes('trip=RT')) {
+            const _precoNum = parseFloat((row['PREÇO'] || '0').toString().replace(/[^0-9.]/g, ''));
+            if (_precoNum > 0) row['PREÇO'] = String(Math.round(_precoNum * 2));
+          }
+
+          if (idaISO && voltaISO && idaISO !== '-' && voltaISO !== '-') {
+            const d1 = new Date(idaISO.substring(0,10) + 'T12:00:00');
+            const d2 = new Date(voltaISO.substring(0,10) + 'T12:00:00');
+            if (!isNaN(d1) && !isNaN(d2)) {
+              const diff = Math.round((d2 - d1) / 86400000);
+              row['_dias'] = diff > 0 ? diff : '';
+            } else {
+              row['_dias'] = '';
+            }
+          } else {
+            row['_dias'] = '';
+          }
+        }
+        const _r = { ...row, _file_date: date, _file_date_ts: dateTs, _is_latest: f.isLatest };
+        const _norm = s => (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+        _r._searchIdx = [_r.PARA, _r.CIDADE, _r['PAÍS'], _r.DE,
+                         _r.City, _r['City Name'], _r.Country, _r['Hotel Name']]
+                        .map(_norm).join(' ');
+        // _escalaRank: 0=direto, 1=1 parada, 2=2 paradas, etc. — for sort
+        if (state.mode === 'voos') {
+          const esc = (_r.ESCALA || '').split('\n')[0].trim().toLowerCase();
+          if (esc === 'direto' || esc === 'sem escala' || esc === '') {
+            _r._escalaRank = 0;
+          } else {
+            const m = esc.match(/(\d+)/);
+            _r._escalaRank = m ? parseInt(m[1]) : 1;
+          }
+        }
+        state.allRows.push(_r);
+      });
+    }
+
+    // ── JOIN: em modo hoteis, busca preço e link REAIS do CSV de voos ──────────
+    let vooMap = {};
+    if (state.mode === 'hoteis' && vooFilesForJoin.length > 0) {
+
+      for (const vf of vooFilesForJoin) {
+        const vDateTs = dateToTs(extractDate(vf.name));
+        const rawUrl  = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${GITHUB_BRANCH}/${vf.path}`;
+        try {
+          const text    = await (await fetch(rawUrl, { headers: GH_HEADERS })).text();
+          const vooRows = parseCSV(text);
+
+          for (const vr of vooRows) {
+            const para = (vr['PARA'] || '').trim().toUpperCase();
+            if (!para) continue;
+
+            // Converte datas do voo para ISO YYYY-MM-DD
+            const idaISO   = (partToISO(vr['DATA_DE_IDA'] || '') || '').substring(0, 10);
+            const voltaRaw = vr['VOLTA'] || '';
+            if (!idaISO || !voltaRaw || voltaRaw === '-' || voltaRaw.toLowerCase() === 'unknown') continue;
+
+            // Infere ano da volta (pode cruzar ano)
+            let voltaISO = '';
+            const vParsed = partToISO(voltaRaw);
+            if (vParsed) {
+              if (/^\d{1,2}-[A-Za-z]{2,4}-\d{2,4}$/.test(voltaRaw)) {
+                voltaISO = vParsed.substring(0, 10); // ano explícito
+              } else {
+                const idaMon  = parseInt(idaISO.split('-')[1]);
+                const idaYear = parseInt(idaISO.split('-')[0]);
+                const vMon    = parseInt(vParsed.split('-')[1]);
+                const yr      = vMon < idaMon ? idaYear + 1 : idaYear;
+                voltaISO = (partToISO(voltaRaw, yr) || '').substring(0, 10);
+              }
+            }
+            if (!voltaISO) continue;
+
+            // Preço: ajusta LATAM RT
+            let preco = parsePrice(vr['PREÇO']);
+            const url = vr['URL'] || '';
+            if (url.includes('latamairlines.com') && url.includes('trip=RT')) {
+              preco = Math.round(preco * 2);
+            }
+
+            const k = `${para}|${idaISO}|${voltaISO}`;
+
+            // Guarda apenas o mais recente por chave
+            if (!vooMap[k] || vDateTs > vooMap[k].dateTs) {
+              vooMap[k] = { preco, url, dateTs: vDateTs };
+            }
+          }
+        } catch (e) { /* arquivo inacessível — ignora */ }
+      }
+
+      // Injection happens AFTER DEDUP — stored in vooMap for later use
+    }
+
+    // DEDUP: para ambos os modos, mantém só o preço mais recente por destino+data
+    // Hoteis: chave = City|Checkin_Date|Hotel Name
+    // Voos:   chave = PARA|DATA_DE_IDA  (sem preço — mostra sempre o preço mais recente)
+    {
+      const bestRow = {};
+      for (const row of state.allRows) {
+        let k;
+        if (state.mode === 'hoteis') {
+          k = [
+            (row['City']         || row['PARA'] || '').trim().toUpperCase(),
+            (row['Checkin_Date'] || '').trim(),
+            (row['Hotel Name']   || '').trim(),
+          ].join('|');
+        } else {
+          k = [
+            (row['PARA']        || '').trim().toUpperCase(),
+            (row['DATA_DE_IDA'] || '').trim(),
+            (row['DATA_VOLTA']  || '').trim(), // inclui volta: OW e ida+volta coexistem
+          ].join('|');
+        }
+        if (!bestRow[k] || row._file_date_ts > bestRow[k]._file_date_ts) {
+          bestRow[k] = row;
+        }
+      }
+      state.allRows = Object.values(bestRow);
+    }
+
+    // ── JOIN inject: agora que DEDUP finalizou state.allRows, injeta preço/link reais do voo ──
+    if (state.mode === 'hoteis' && Object.keys(vooMap).length > 0) {
+      for (const r of state.allRows) {
+        const iata     = (r['City'] || '').trim().toUpperCase();
+        const checkin  = (r['Checkin_Date']  || '').trim().substring(0, 10);
+        const checkout = (r['Checkout_Date'] || '').trim().substring(0, 10);
+        if (!iata || !checkin || !checkout) continue;
+        const voo = vooMap[`${iata}|${checkin}|${checkout}`];
+        if (voo) {
+          const hotelPrice  = parsePrice(r['Price']) || 0;
+          r['Air Price']    = voo.preco;
+          r['url_flight']   = voo.url;
+          r['Final Price']  = Math.round(hotelPrice + voo.preco);
+        }
+      }
+    }
+
+    // Normalize _dias for ALL voos rows — ensures sort works correctly
+    if (state.mode === 'voos') {
+      const toISO = s => {
+        if (!s || s === '-') return null;
+        if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.substring(0,10);
+        const m = s.match(/^(\d{2})-(\d{2})-(\d{2,4})$/);
+        if (m) { let y=parseInt(m[3]); if(y<100)y+=2000; return `${y}-${m[2]}-${m[1]}`; }
+        return null;
+      };
+      for (const row of state.allRows) {
+        if (row['_dias']) continue; // already computed
+        const idaISO   = toISO(row['DATA_DE_IDA']  || '');
+        const voltaISO = toISO(row['DATA_VOLTA']    || '');
+        if (idaISO && voltaISO) {
+          const d1 = new Date(idaISO + 'T12:00:00');
+          const d2 = new Date(voltaISO + 'T12:00:00');
+          if (!isNaN(d1) && !isNaN(d2)) {
+            const diff = Math.round((d2 - d1) / 86400000);
+            row['_dias'] = diff > 0 ? diff : '';
+          }
+        }
+      }
+    }
+
+    state.sortCol = state.mode === 'hoteis' ? 'Final Price' : 'PREÇO';
+    state.sortAsc = true;
+    state.currentPage = 0;
+    _updateToggleVisibility();
+    render();
+  } catch (err) {
+    hideLoading();
+    document.getElementById('loadingBox').innerHTML = `<span style="color:#e85d04">⚠️ Erro: ${err.message}</span>`;
+    document.getElementById('emptyState').querySelector('p').textContent = 'Erro ao carregar: ' + err.message;
+  }
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════
+// DATE PARSING — "2abr5abr" → {ida: "2026-04-02", volta: "2026-04-05"}
+// ══════════════════════════════════════════════════════════════════════════
+
+
+function parseMonthAbbr(abbr) {
+  const n = MONTH_MAP[abbr.toLowerCase()];
+  return n ? String(n).padStart(2,'0') : null;
+}
+
+// Splits "2abr5abr" into ["2abr","5abr"] — handles doubled letters like "junn","sett"
+function splitIdaVolta(raw) {
+  if (!raw || raw.trim() === '' || raw === 'Unknown' || raw === '-') return [raw, ''];
+  const s = raw.trim();
+
+  // Try to split on known month abbreviations (longest first to avoid partial match)
+  const monthKeys = Object.keys(MONTH_MAP).sort((a,b) => b.length - a.length);
+  const monthPattern = monthKeys.join('|');
+  const re = new RegExp(`^(\\d{1,2})(${monthPattern})(\\d{1,2})(${monthPattern})$`, 'i');
+  const m = s.match(re);
+  if (m) {
+    return [m[1] + m[2], m[3] + m[4]];
+  }
+
+  // Single date only (e.g. "2abr" with no return)
+  const reSingle = new RegExp(`^(\\d{1,2})(${monthPattern})$`, 'i');
+  const ms = s.match(reSingle);
+  if (ms) return [s, ''];
+
+  // Already ISO format YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return [s, ''];
+
+  return [s, ''];
+}
+
+function partToISO(part, refYear) {
+  if (!part) return '';
+  // Already full ISO YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(part)) return part;
+  // DD-MM-YY or DD-MM-YYYY (scraper format)
+  const ddmmyy = part.match(/^(\d{2})-(\d{2})-(\d{2,4})$/);
+  if (ddmmyy) {
+    const day = ddmmyy[1], mon = ddmmyy[2];
+    let yr = parseInt(ddmmyy[3]);
+    if (yr < 100) yr += 2000; // 27 → 2027
+    return `${yr}-${mon}-${day}`;
+  }
+  // DD-Mmm-YY format (V19+: "17-Apr-26", "03-Jan-27") — ano explícito, confiar
+  const ddMmmYY = part.match(/^(\d{1,2})-([A-Za-z]{2,4})-(\d{2,4})$/);
+  if (ddMmmYY) {
+    const day = ddMmmYY[1].padStart(2, '0');
+    const mon = parseMonthAbbr(ddMmmYY[2]);
+    let yr = parseInt(ddMmmYY[3]);
+    if (yr < 100) yr += 2000; // 26→2026, 27→2027
+    if (mon) return `${yr}-${mon}-${day}`;
+  }
+  // DD-Mmm format (legado sem ano: "30-Apr", "03-May") — inferir ano pelo mês atual
+  const ddMmm = part.match(/^(\d{1,2})-([A-Za-z]{2,4})$/);
+  if (ddMmm) {
+    const day = ddMmm[1].padStart(2, '0');
+    const mon = parseMonthAbbr(ddMmm[2]);
+    if (mon) {
+      if (refYear !== undefined) return `${refYear}-${mon}-${day}`;
+      const now = new Date();
+      const curMon = now.getMonth() + 1;
+      let year = now.getFullYear();
+      if (parseInt(mon) < curMon) year++;
+      return `${year}-${mon}-${day}`;
+    }
+  }
+  const monthKeys = Object.keys(MONTH_MAP).sort((a,b) => b.length - a.length);
+  const monthPattern = monthKeys.join('|');
+  const re = new RegExp(`^(\\d{1,2})(${monthPattern})$`, 'i');
+  const m = part.match(re);
+  if (!m) return part;
+  const day = m[1].padStart(2, '0');
+  const mon = parseMonthAbbr(m[2]);
+  if (!mon) return part;
+  if (refYear !== undefined) {
+    return `${refYear}-${mon}-${day}`;
+  }
+  const now = new Date();
+  let year = now.getFullYear();
+  const testDate = new Date(year, parseInt(mon)-1, parseInt(day));
+  if (testDate < now) year++;
+  return `${year}-${mon}-${day}`;
+}
+
+function parseDateField(raw) {
+  // Returns {ida: 'YYYY-MM-DD', volta: 'YYYY-MM-DD'}
+  const [idaPart, voltaPart] = splitIdaVolta(raw);
+  const idaISO = partToISO(idaPart);
+  let voltaISO = '';
+  if (voltaPart) {
+    // Derive volta year from ida: same year unless volta month < ida month (crosses year)
+    const idaMonth = idaISO ? parseInt(idaISO.split('-')[1]) : 0;
+    const idaYear  = idaISO ? parseInt(idaISO.split('-')[0]) : new Date().getFullYear();
+    const voltaMonthKeys = Object.keys(MONTH_MAP).sort((a,b) => b.length - a.length);
+    const voltaMonthPat  = voltaMonthKeys.join('|');
+    const vmatch = voltaPart.match(new RegExp(`^\\d{1,2}(${voltaMonthPat})$`, 'i'));
+    const voltaMonNum = vmatch ? (MONTH_MAP[vmatch[1].toLowerCase()] || 0) : 0;
+    const voltaYear = voltaMonNum > 0 && voltaMonNum < idaMonth ? idaYear + 1 : idaYear;
+    voltaISO = partToISO(voltaPart, voltaYear);
+  }
+  return { ida: idaISO, volta: voltaISO };
+}
+
+// ── CSV ────────────────────────────────────────────────────────────────────
+function parseCSV(text) {
+  // Parse character-by-character so quoted fields with \n are handled correctly
+  text = text.replace(/\r/g, '');
+  const rows = [];
+  let cur = '', q = false, fields = [], i = 0;
+
+  while (i < text.length) {
+    const c = text[i];
+    if (c === '"') {
+      if (q && text[i+1] === '"') { cur += '"'; i += 2; continue; } // escaped quote
+      q = !q; i++; continue;
+    }
+    if (c === ',' && !q) { fields.push(cur); cur = ''; i++; continue; }
+    if (c === '\n' && !q) {
+      fields.push(cur); cur = '';
+      if (fields.some(f => f.trim())) rows.push(fields);
+      fields = []; i++; continue;
+    }
+    cur += c; i++;
+  }
+  // Last field/row
+  fields.push(cur);
+  if (fields.some(f => f.trim())) rows.push(fields);
+
+  if (rows.length < 2) return [];
+  const headers = rows[0].map(h => h.trim());
+  return rows.slice(1).map(cols => {
+    const obj = {};
+    headers.forEach((h, idx) => { obj[h] = (cols[idx] || '').trim(); });
+    return obj;
+  });
+}
+
+function extractDate(name) {
+  const m = name.match(/(\d{4}-\d{2}-\d{2})(?:[_T](\d{2}[-:]\d{2}))?/);
+  if (m) return m[1] + (m[2] ? ' ' + m[2].replace('-', ':') : '');
+  return 'data desconhecida';
+}
+
+// ── FILTER & SORT ──────────────────────────────────────────────────────────
+function getSortVal(row, col) {
+  if (col === '_file_date')   return row._file_date_ts;
+  if (col === 'Checkin_Date' || col === 'DATA_DE_IDA') return isoToTs(row[col]);
+  if (col === '_dias') return parseInt(row['_dias']) || 0;
+  if (col === '_escalaRank') return row._escalaRank !== undefined ? row._escalaRank : 99;
+  if (col === 'Final Price') {
+    // Car destinations: fp = hotel + 100 (matches rowH display)
+    const iata = (row['City'] || '').trim().toUpperCase();
+    if (['GRU','CGH','SAO'].includes(iata)) {
+      return parsePrice(row['Price']) + 100;
+    }
+    return parsePrice(row['Final Price']);
+  }
+  if (['Price','Air Price','PREÇO','MILHAS','# Days'].includes(col)) return parsePrice(row[col]);
+  return row[col] || '';
+}
+
+function getFiltered() {
+  let rows = state.allRows;
+  const key = state.mode === 'hoteis' ? 'City' : 'PARA';
+
+  if (state.selectedDest !== 'ALL') rows = rows.filter(r => r[key] === state.selectedDest);
+
+  // Origin filter (voos only)
+  if (state.mode === 'voos' && state.selectedOrigin !== 'ALL') {
+    rows = rows.filter(r => (r.DE || '').trim().toUpperCase() === state.selectedOrigin);
+  }
+
+  // Dias filter (voos only)
+  if (state.diasFilter.length > 0) {
+    rows = rows.filter(r => state.diasFilter.includes(String(r._dias)));
+  }
+
+  if (state.search) {
+    const norm = s => (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const q = norm(state.search);
+    // Expand query with aliases — also match alias keys that START WITH the query
+    const aliasTerms = new Set([q]);
+    for (const [key, vals] of Object.entries(SEARCH_ALIASES)) {
+      const normKey = norm(key);
+      if (normKey === q || normKey.startsWith(q) || q.startsWith(normKey)) {
+        aliasTerms.add(normKey);
+        vals.forEach(v => aliasTerms.add(norm(v)));
+      }
+    }
+    const matches = (field) => {
+      const f = norm(field);
+      for (const term of aliasTerms) { if (f.includes(term)) return true; }
+      return false;
+    };
+    // Usa índice pré-computado — muito mais rápido em 100k+ linhas
+    rows = rows.filter(r => {
+      if (r._searchIdx) {
+        for (const term of aliasTerms) { if (r._searchIdx.includes(term)) return true; }
+        return false;
+      }
+      // fallback se índice não existir
+      if (state.mode === 'hoteis') return matches(r.City) || matches(r['City Name']) || matches(r.Country) || matches(r['Hotel Name']);
+      return matches(r.PARA) || matches(r.CIDADE) || matches(r['PAÍS']) || matches(r.DE);
+    });
+  }
+
+  // Feriado filter (multi-select — OR entre feriados selecionados)
+  if (state.feriadoFilter.length > 0) {
+    const selectedFeriados = FERIADOS.filter(f => state.feriadoFilter.includes(f.name));
+    const idaKey   = state.mode === 'hoteis' ? 'Checkin_Date' : 'DATA_DE_IDA';
+    const voltaKey = state.mode === 'hoteis' ? 'Checkout_Date' : 'DATA_VOLTA';
+    rows = rows.filter(r => {
+      const ida = getRowDate(r, idaKey);
+      if (!ida) return false;
+      return selectedFeriados.some(feriado => {
+        if (!dateInFeriado(ida, feriado)) return false;
+        if (feriado.voltaMax || feriado.voltaMin) {
+          const volta = getRowDate(r, voltaKey);
+          if (!volta) return false;
+          const v = midnightOf(volta);
+          if (feriado.voltaMax) {
+            const max = new Date(ida.getFullYear(), feriado.voltaMax.m - 1, feriado.voltaMax.d);
+            if (v > max) return false;
+          }
+          if (feriado.voltaMin) {
+            const min = new Date(ida.getFullYear(), feriado.voltaMin.m - 1, feriado.voltaMin.d);
+            if (v < min) return false;
+          }
+        }
+        return true;
+      });
+    });
+  }
+
+  // Regiao filter (multi-select — OR entre regiões selecionadas)
+  if (state.regiaoFilter.length > 0) {
+    rows = rows.filter(r => state.regiaoFilter.includes(getRowRegiao(r)));
+  }
+
+  // Ida/Volta filter (voos only)
+  if (state.mode === 'voos' && state.idaVoltaFilter !== 'ALL') {
+    rows = rows.filter(r => {
+      const v = (r.DATA_VOLTA || '').trim();
+      const temVolta = v && v !== '-' && v.toLowerCase() !== 'unknown';
+      return state.idaVoltaFilter === 'idavolta' ? temVolta : !temVolta;
+    });
+  }
+
+  // Date filter
+  if (state.selectedMonth !== 'ALL') {
+    const dateKey = state.mode === 'hoteis' ? 'Checkin_Date' : 'DATA_DE_IDA';
+    rows = rows.filter(r => {
+      const d = getRowDate(r, dateKey);
+      if (!d) return false;
+      if (MESES[d.getMonth()] !== state.selectedMonth) return false;
+      if (state.selectedDays.length > 0) {
+        if (!state.selectedDays.includes(String(d.getDate()).padStart(2,'0'))) return false;
+      }
+      return true;
+    });
+  }
+
+  const sorted = [...rows].sort((a, b) => {
+    const va = getSortVal(a, state.sortCol), vb = getSortVal(b, state.sortCol);
+    if (typeof va === 'number' && typeof vb === 'number') return state.sortAsc ? va - vb : vb - va;
+    return state.sortAsc ? String(va).localeCompare(String(vb)) : String(vb).localeCompare(String(va));
+  });
+
+  const start = state.currentPage * PAGE_SIZE;
+  return { rows: sorted.slice(start, start + PAGE_SIZE), total: sorted.length };
+}
+
+// Retorna TODOS os rows filtrados sem paginar — usado pelos filtros laterais
+function getAllFiltered(overrides = {}) {
+  const savedDias      = state.diasFilter;
+  const savedIdaVolta  = state.idaVoltaFilter;
+  const savedRegiao    = state.regiaoFilter;
+  const savedFeriado   = state.feriadoFilter;
+  const savedMonth     = state.selectedMonth;
+  const savedDay       = state.selectedDays;
+  const savedPage      = state.currentPage;
+
+  Object.assign(state, overrides);
+  state.currentPage = 0;
+
+  // Temporarily bump PAGE_SIZE to get all rows
+  const origPS = PAGE_SIZE;
+  // We can't reassign const, so use getFiltered with a trick:
+  // Instead, just duplicate the filter logic inline with no slice
+  let rows = state.allRows;
+  const key = state.mode === 'hoteis' ? 'City' : 'PARA';
+  if (state.selectedDest !== 'ALL') rows = rows.filter(r => r[key] === state.selectedDest);
+  if (state.mode === 'voos' && state.selectedOrigin !== 'ALL') {
+    rows = rows.filter(r => (r.DE || '').trim().toUpperCase() === state.selectedOrigin);
+  }
+  if (state.diasFilter.length > 0) rows = rows.filter(r => state.diasFilter.includes(String(r._dias)));
+  if (state.search) {
+    const norm = s => (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const q = norm(state.search);
+    const aliasTerms = new Set([q]);
+    for (const [ak, vals] of Object.entries(SEARCH_ALIASES)) {
+      const nk = norm(ak);
+      if (nk === q || nk.startsWith(q) || q.startsWith(nk)) { aliasTerms.add(nk); vals.forEach(v => aliasTerms.add(norm(v))); }
+    }
+    const matches = f => { const fn = norm(f); for (const t of aliasTerms) { if (fn.includes(t)) return true; } return false; };
+    rows = rows.filter(r => {
+      if (r._searchIdx) { for (const t of aliasTerms) { if (r._searchIdx.includes(t)) return true; } return false; }
+      if (state.mode === 'hoteis') return matches(r.City) || matches(r['City Name']) || matches(r.Country) || matches(r['Hotel Name']);
+      return matches(r.PARA) || matches(r.CIDADE) || matches(r['PAÍS']) || matches(r.DE);
+    });
+  }
+  if (state.feriadoFilter.length > 0) {
+    const selF = FERIADOS.filter(f => state.feriadoFilter.includes(f.name));
+    const idaK = state.mode === 'hoteis' ? 'Checkin_Date' : 'DATA_DE_IDA';
+    const volK = state.mode === 'hoteis' ? 'Checkout_Date' : 'DATA_VOLTA';
+    rows = rows.filter(r => {
+      const ida = getRowDate(r, idaK); if (!ida) return false;
+      return selF.some(feriado => {
+        if (!dateInFeriado(ida, feriado)) return false;
+        if (feriado.voltaMax || feriado.voltaMin) {
+          const volta = getRowDate(r, volK); if (!volta) return false;
+          const v = midnightOf(volta);
+          if (feriado.voltaMax && v > new Date(ida.getFullYear(), feriado.voltaMax.m-1, feriado.voltaMax.d)) return false;
+          if (feriado.voltaMin && v < new Date(ida.getFullYear(), feriado.voltaMin.m-1, feriado.voltaMin.d)) return false;
+        }
+        return true;
+      });
+    });
+  }
+  if (state.regiaoFilter.length > 0) rows = rows.filter(r => state.regiaoFilter.includes(getRowRegiao(r)));
+  if (state.mode === 'voos' && state.idaVoltaFilter !== 'ALL') {
+    rows = rows.filter(r => { const v=(r.DATA_VOLTA||'').trim(); const tv=v&&v!=='-'&&v.toLowerCase()!=='unknown'; return state.idaVoltaFilter==='idavolta'?tv:!tv; });
+  }
+  if (state.selectedMonth !== 'ALL') {
+    const dk = state.mode === 'hoteis' ? 'Checkin_Date' : 'DATA_DE_IDA';
+    rows = rows.filter(r => { const d=getRowDate(r,dk); if(!d)return false; if(MESES[d.getMonth()]!==state.selectedMonth)return false; if(state.selectedDays.length>0&&!state.selectedDays.includes(String(d.getDate()).padStart(2,'0')))return false; return true; });
+  }
+
+  // restore
+  state.diasFilter     = savedDias;
+  state.idaVoltaFilter = savedIdaVolta;
+  state.regiaoFilter   = savedRegiao;
+  state.feriadoFilter  = savedFeriado;
+  state.selectedMonth  = savedMonth;
+  state.selectedDays   = savedDay;
+  state.currentPage    = savedPage;
+
+  return rows;
+}
+
+function getDests() {
+  const key = state.mode === 'hoteis' ? 'City' : 'PARA';
+  return [...new Set(state.allRows.map(r => r[key]).filter(Boolean))].sort();
+}
+
+// ── RENDER ─────────────────────────────────────────────────────────────────
+function render() { _updateToggleVisibility(); renderFileList(); renderOriginFilter(); renderDateFilter(); renderDiasFilter(); renderFeriadosFilter(); renderRegiaoFilter(); renderIdaVoltaFilter(); renderSortBar(); renderTable(); updateStatus(); showDesktopMap(); }
+
+// Chamado após qualquer mudança de filtro — atualiza TUDO
+
+// ── ORIGEM FILTER ─────────────────────────────────────────────────────────────
+function renderOriginFilter() {
+  const section = document.getElementById('originFilterSection');
+  if (!section) return;
+
+  // Only show in voos mode
+  if (state.mode !== 'voos') { section.style.display = 'none'; return; }
+
+  // Collect unique origins from loaded data
+  const origins = [...new Set(
+    state.allRows
+      .map(r => (r.DE || '').trim().toUpperCase())
+      .filter(v => v && v !== '-' && v !== 'UNKNOWN')
+  )].sort();
+
+  // Hide if only 1 origin
+  if (origins.length <= 1) { section.style.display = 'none'; return; }
+
+  // Default to SAO on FIRST load only (not after a manual reset)
+  if (state.mode === 'voos' && state.selectedOrigin === 'ALL' && origins.includes('SAO') && !state._originManuallyReset) {
+    state.selectedOrigin = 'SAO';
+  }
+
+  section.style.display = 'block';
+  const grid = document.getElementById('originGrid');
+  if (!grid) return;
+
+  const accentColor = 'var(--mode-accent)';
+  const accentLight = 'var(--mode-light)';
+
+  const allActive = state.selectedOrigin === 'ALL';
+  let btns = `<button data-oval="ALL" style="
+    padding:7px 14px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:${allActive?'600':'400'};
+    border:1.5px solid ${allActive?accentColor:'var(--border)'};
+    background:${allActive?accentLight:'#fff'};
+    color:${allActive?accentColor:'var(--text-muted)'};
+  ">Todas</button>`;
+
+  origins.forEach(orig => {
+    const isActive = state.selectedOrigin === orig;
+    btns += `<button data-oval="${orig}" style="
+      padding:7px 14px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:${isActive?'600':'400'};
+      border:1.5px solid ${isActive?accentColor:'var(--border)'};
+      background:${isActive?accentLight:'#fff'};
+      color:${isActive?accentColor:'var(--text-muted)'};
+    ">${orig}</button>`;
+  });
+
+  grid.innerHTML = btns;
+
+  grid.querySelectorAll('button[data-oval]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.selectedOrigin = btn.getAttribute('data-oval');
+      state._originManuallyReset = false; // user chose explicitly — allow future auto-default
+      state.currentPage = 0;
+      _invalidateCountCache();
+      renderOriginFilter(); // update button styles immediately
+      debouncedRender();
+    });
+  });
+}
+function renderAllFilters() {
+  renderOriginFilter();
+  renderDateFilter();
+  renderDiasFilter();
+  renderFeriadosFilter();
+  renderRegiaoFilter();
+  renderIdaVoltaFilter();
+  renderTable();
+  updateStatus();
+  maybeRenderMap();
+}
+
+// Debounced version — usada por filtros interativos (feriados, região, dias, mês, etc.)
+
+function resetAllFilters() {
+  state.selectedDest    = 'ALL';
+  state.search          = '';
+  state.selectedMonth   = 'ALL';
+  state.selectedDays    = [];
+  state.currentPage     = 0;
+  state.feriadoFilter   = [];
+  state.regiaoFilter    = [];
+  state.diasFilter      = [];
+  state.idaVoltaFilter  = 'idavolta';
+  state.selectedOrigin       = 'SAO';
+  state._originManuallyReset = false;
+  state.classFilter     = 'ECO';
+  const inp = document.getElementById('searchInput');
+  if (inp) inp.value = '';
+  _invalidateCountCache();
+  render();
+}
+
+function setClassFilter(val) {
+  state.classFilter = val;
+  // Update pill button styles
+  ['ECO','EXE'].forEach(v => {
+    const btn = document.getElementById('classBtn_' + v);
+    if (btn) btn.classList.toggle('active', v === val);
+  });
+  // Reload data with new file pattern
+  state.files = []; state.allRows = []; state.currentPage = 0;
+  showLoading(); loadFromGitHub();
+}
+
+function setIdaVoltaToggle(val) {
+  state.idaVoltaFilter = val;
+  ['idavolta','ida','ALL'].forEach(v => {
+    const btn = document.getElementById('ivBtn_' + v);
+    if (btn) btn.classList.toggle('active', v === val);
+  });
+  state.currentPage = 0;
+  debouncedRender();
+}
+
+function _updateToggleVisibility() {
+  // vooToggleSection — always visible in voos mode (independent of origin count)
+  const vts = document.getElementById('vooToggleSection');
+  if (vts) vts.style.display = state.mode === 'voos' ? 'block' : 'none';
+  // idaVolta toggle — only in voos mode
+  const ivt = document.getElementById('idaVoltaToggle');
+  if (ivt) ivt.style.display = state.mode === 'voos' ? '' : 'none';
+  // ECO/EXE toggle — only in voos mode (hoteis don't have class filter)
+  const ct = document.getElementById('classToggle');
+  if (ct) ct.style.display = state.mode === 'voos' ? '' : 'none';
+  // Sync class filter pills
+  ['ECO','EXE'].forEach(v => {
+    const btn = document.getElementById('classBtn_' + v);
+    if (!btn) return;
+    btn.classList.remove('active');
+    if (v === state.classFilter) btn.classList.add('active');
+  });
+  // Sync ida/volta pills
+  ['idavolta','ida','ALL'].forEach(v => {
+    const btn = document.getElementById('ivBtn_' + v);
+    if (!btn) return;
+    btn.classList.remove('active');
+    if (v === state.idaVoltaFilter) btn.classList.add('active');
+  });
+}
+function debouncedRender() {
+  clearTimeout(window._filterDebounce);
+  window._filterDebounce = setTimeout(renderAllFilters, 500);
+}
+
+// Cache de counts — evita getAllFiltered() em cada click de feriado/região
+let _cachedFeriadoCounts = null;  // { feriadoName: count }
+let _cachedRegiaoCounts  = null;  // { regiaoVal: count }
+let _cachedBaseLen       = -1;    // total rows na última contagem
+
+function _invalidateCountCache() {
+  _cachedFeriadoCounts = null;
+  _cachedRegiaoCounts  = null;
+  _cachedBaseLen       = -1;
+}
+
+function _getFeriadoCounts() {
+  const baseRows = getAllFiltered({ feriadoFilter: [] });
+  if (_cachedFeriadoCounts && _cachedBaseLen === baseRows.length) return _cachedFeriadoCounts;
+  const idaKey   = state.mode === 'hoteis' ? 'Checkin_Date' : 'DATA_DE_IDA';
+  const voltaKey = state.mode === 'hoteis' ? 'Checkout_Date' : 'DATA_VOLTA';
+  _cachedFeriadoCounts = {};
+  _cachedBaseLen = baseRows.length;
+  FERIADOS.forEach(o => {
+    _cachedFeriadoCounts[o.name] = baseRows.filter(r => {
+      const ida = getRowDate(r, idaKey); if (!ida) return false;
+      if (!dateInFeriado(ida, o)) return false;
+      if (o.voltaMax || o.voltaMin) {
+        const volta = getRowDate(r, voltaKey); if (!volta) return false;
+        const v = midnightOf(volta);
+        if (o.voltaMax && v > new Date(ida.getFullYear(), o.voltaMax.m-1, o.voltaMax.d)) return false;
+        if (o.voltaMin && v < new Date(ida.getFullYear(), o.voltaMin.m-1, o.voltaMin.d)) return false;
+      }
+      return true;
+    }).length;
+  });
+  return _cachedFeriadoCounts;
+}
+
+function _getRegiaoCounts() {
+  const baseRows = getAllFiltered({ regiaoFilter: [] });
+  if (_cachedRegiaoCounts && _cachedBaseLen === baseRows.length) return _cachedRegiaoCounts;
+  _cachedRegiaoCounts = {};
+  _cachedBaseLen = baseRows.length;
+  baseRows.forEach(r => { const reg = getRowRegiao(r); if (reg) _cachedRegiaoCounts[reg] = (_cachedRegiaoCounts[reg]||0)+1; });
+  return _cachedRegiaoCounts;
+}
+
+function showLoading() {
+  document.getElementById('loadingBox').style.display = 'block';
+  document.getElementById('loadingBox').innerHTML = '<span class="spinner"></span>buscando CSVs...';
+  document.getElementById('fileList').innerHTML = '';
+  document.getElementById('emptyState').style.display = 'block';
+  document.getElementById('dataSection').style.display = 'none';
+  document.getElementById('status-bar').innerHTML = 'carregando...';
+  // Show airplane modal on mobile
+  if (window.innerWidth < 768) {
+    document.getElementById('airplaneModal').classList.add('active');
+  }
+}
+
+function hideLoading() {
+  document.getElementById('airplaneModal').classList.remove('active');
+}
+
+function renderFileList() {
+  document.getElementById('loadingBox').style.display = 'none';
+  hideLoading(); // dismiss airplane modal
+  const el = document.getElementById('fileList');
+  if (!state.files.length) { el.innerHTML = '<div style="font-size:11px;color:var(--text-dim);text-align:center;padding:4px">Nenhum arquivo encontrado</div>'; return; }
+  el.innerHTML = [...state.files].reverse().map(f => `
+    <div class="file-chip ${f.isLatest ? 'latest' : ''}">
+      <div class="fc-dot"></div>
+      <div class="fc-info">
+        <div class="fc-date">${f.date} ${f.isLatest ? '<span class="badge-latest">ATUAL</span>' : ''}</div>
+        <div class="fc-name" title="${f.name}">${f.name}</div>
+        <div class="fc-count">${f.count} registros</div>
+      </div>
+    </div>`).join('');
+}
+
+function renderDiasFilter() {
+  const section = document.getElementById('diasFilterSection');
+  if (!section) return;
+
+  // Usa getAllFiltered ignorando diasFilter — respeita todos os outros filtros ativos
+  // (data de ida, mês, origem, etc.) para mostrar só os dias realmente disponíveis
+  const filteredRows = getAllFiltered({ diasFilter: [] });
+  const diasSet = new Set();
+  filteredRows.forEach(r => { if (r._dias) diasSet.add(String(r._dias)); });
+
+  // Remove botões ativos que não existem mais nos resultados filtrados
+  if (state.diasFilter.length > 0) {
+    state.diasFilter = state.diasFilter.filter(d => diasSet.has(d));
+  }
+
+  const dias = [...diasSet].sort((a, b) => parseInt(a) - parseInt(b));
+  if (!dias.length) { section.style.display = 'none'; return; }
+  section.style.display = 'block';
+
+  const grid = document.getElementById('diasFilterGrid');
+  const allActive = state.diasFilter.length === 0;
+  grid.innerHTML =
+    `<button class="city-btn all-btn ${allActive ? 'active' : ''}" data-dval="ALL">TODOS</button>` +
+    dias.map(d => {
+      const isActive = state.diasFilter.includes(String(d));
+      return `<button class="city-btn ${isActive ? 'active' : ''}" data-dval="${d}">${d}d</button>`;
+    }).join('');
+
+  grid.querySelectorAll('button[data-dval]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const val = btn.getAttribute('data-dval');
+      if (val === 'ALL') {
+        state.diasFilter = [];
+      } else {
+        const s = String(val);
+        const i = state.diasFilter.indexOf(s);
+        if (i >= 0) state.diasFilter.splice(i, 1);
+        else state.diasFilter.push(s);
+      }
+      state.currentPage = 0;
+      debouncedRender();
+    });
+  });
+
+  // Collapse behavior — always starts closed (consistent with other filters)
+  const arrow = document.getElementById('diasFilterArrow');
+  const body = document.getElementById('diasFilterBody');
+  if (!section._initialized) {
+    section._initialized = true;
+    section._open = false;
+    body.style.display = 'none';
+    if (arrow) arrow.classList.remove('open');
+  }
+}
+
+const SORT_H = [
+  {col:'Final Price', label:'Preço Total'},
+  {col:'Checkin_Date', label:'Check-in'},
+  {col:'# Days', label:'Dias'},
+  {col:'_file_date', label:'Data Busca'},
+];
+const SORT_V = [
+  {col:'PREÇO', label:'Preço'},
+  {col:'DATA_DE_IDA', label:'Data'},
+  {col:'_dias', label:'Dias'},
+  {col:'_escalaRank', label:'Escala'},
+];
+
+function renderSortBar() {
+  const cols = state.mode === 'hoteis' ? SORT_H : SORT_V;
+  document.getElementById('sortGroup').innerHTML =
+    `<span style="font-size:12px;color:var(--text-muted)">Ordenar:</span>` +
+    cols.map(c => `<button class="sort-btn ${state.sortCol===c.col?'active':''}" onclick="setSort('${c.col}')">${c.label}${state.sortCol===c.col?(state.sortAsc?' ↑':' ↓'):''}</button>`).join('');
+}
+
+// Sem coluna VOLTA; Preços renomeado para "PREÇOS (3pax)"; Data Busca no final
+const HEAD_H = ['PREÇOS (3pax)','PARA','CIDADE','CHECK-IN','DIAS','HOTEL','FONTE','LINKS','DATA BUSCA'];
+const HEAD_V = ['PREÇO','DE','PARA','CIDADE','IDA/VOLTA','DATA IDA','DATA VOLTA','DIAS','HORÁRIO','ESCALA','MILHAS','LINK','DATA BUSCA'];
+
+// Min-width overrides (px) for specific columns — others use table default
+const COL_MINWIDTH = {
+  'PREÇO':         120,
+  'PREÇOS (3pax)': 170,
+  'PARA':          80,
+  'CIDADE':        160,
+  'IDA/VOLTA':     100,
+  'DATA BUSCA':    150,
+  'HOTEL':         170,
+};
+
+function renderTable() {
+  const empty = document.getElementById('emptyState');
+  const section = document.getElementById('dataSection');
+  if (!state.files.length) { empty.style.display='block'; section.style.display='none'; return; }
+  empty.style.display='none'; section.style.display='block';
+  // Forçar primeiro render do mapa após DOM estar visível
+  setTimeout(() => { if (typeof maybeRenderMap === 'function') { maybeRenderMap(); if (leafletMap) leafletMap.invalidateSize(true); } }, 150);
+
+  const { rows, total } = getFiltered();
+  const start = state.currentPage * PAGE_SIZE;
+  const pageInfo = total > PAGE_SIZE
+    ? ` <span style="color:var(--text-dim);font-size:10px">(${start+1}–${Math.min(start+rows.length,total)} de ${total})</span>`
+    : '';
+  document.getElementById('resultCount').innerHTML = `<b>${rows.length}</b> resultados${pageInfo}`;
+
+  const heads = state.mode === 'hoteis' ? HEAD_H : HEAD_V;
+  document.getElementById('tableHead').innerHTML = '<tr>' + heads.map(h => {
+    const mw = COL_MINWIDTH[h];
+    return `<th${mw ? ` style="min-width:${mw}px"` : ''}>${h}</th>`;
+  }).join('') + '</tr>';
+
+  const tbody = document.getElementById('tableBody');
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="${heads.length}" style="text-align:center;padding:40px;color:var(--text-dim)">Nenhum resultado encontrado</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = rows.map(r => state.mode === 'hoteis' ? rowH(r) : rowV(r)).join('');
+
+  // Pagination buttons — always remove old bar first
+  const oldBar = document.getElementById('paginationBar');
+  if (oldBar) oldBar.remove();
+
+  const prevDisabled = state.currentPage === 0;
+  const nextDisabled = (state.currentPage + 1) * PAGE_SIZE >= total;
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+  const curPage = state.currentPage + 1;
+  const tableWrap = document.getElementById('tableWrapEl');
+
+  if (totalPages > 1) {
+    const bar = document.createElement('div');
+    bar.id = 'paginationBar';
+    bar.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:10px;padding:16px;border-top:1px solid var(--border)';
+    bar.innerHTML = `
+      <button onclick="goPage(${state.currentPage-1})" ${prevDisabled?'disabled':''} style="padding:6px 14px;border:1px solid var(--border);border-radius:6px;background:#fff;cursor:${prevDisabled?'not-allowed':'pointer'};color:${prevDisabled?'var(--text-dim)':'var(--mode-accent)'};font-size:12px">← Anterior</button>
+      <span style="font-family:var(--mono);font-size:11px;color:var(--text-muted)">pág ${curPage} de ${totalPages}</span>
+      <button onclick="goPage(${state.currentPage+1})" ${nextDisabled?'disabled':''} style="padding:6px 14px;border:1px solid var(--border);border-radius:6px;background:${nextDisabled?'#fff':'var(--mode-accent)'};cursor:${nextDisabled?'not-allowed':'pointer'};color:${nextDisabled?'var(--text-dim)':'#fff'};font-size:12px;font-weight:500">Próximos ${PAGE_SIZE} →</button>
+    `;
+    tableWrap.insertAdjacentElement('afterend', bar);
+  }
+
+  // Reorder: statsBar and filesSection always come after paginationBar
+  const statsBar = document.getElementById('statsBar');
+  const filesSection = document.getElementById('filesSection');
+  const dataSection = document.getElementById('dataSection');
+  if (statsBar && filesSection && dataSection) {
+    dataSection.appendChild(statsBar);
+    dataSection.appendChild(filesSection);
+  }
+}
+
+function rowH(r) {
+  const hp = parsePrice(r['Price']);
+  const iata = (r.City || '').trim().toUpperCase();
+  const isCarDest = ['GRU','CGH','SAO'].includes(iata);
+
+  // Car destinations: transport = R$100 (1x, whole car for the group)
+  // Flight destinations: transport = actual air price (3x, per person)
+  const ap = isCarDest ? 100 : parsePrice(r['Air Price']);
+  const fp = isCarDest ? Math.round(hp + 100) : parsePrice(r['Final Price']);
+  const transportIcon = isCarDest ? '🚗' : '✈️';
+  const apLabel = isCarDest ? '(1x)' : '(3x)';
+
+  return `<tr>
+    <td>
+      <div class="price-final">R$ ${fmtN(fp)}</div>
+      <div class="price-sub">🏨 R$ ${fmtN(hp)} <span style="font-size:10px;color:#9ba3b5">(1x)</span></div>
+      <div class="price-sub">${transportIcon} R$ ${fmtN(ap)} <span style="font-size:10px;color:#9ba3b5">${apLabel}</span></div>
+    </td>
+    <td><span class="badge-dest hotel">${r.City||'?'}</span></td>
+    <td><div style="font-size:12px">${r['City Name']||'-'}</div><small style="color:var(--text-dim)">${r.Country||r['PAÍS']||''}</small></td>
+    <td style="font-family:var(--mono);font-size:12px">${fmtDate(r.Checkin_Date)}</td>
+    <td style="font-family:var(--mono);text-align:center">${r['# Days']||'-'}</td>
+    <td><div style="font-size:12px;line-height:1.3;max-width:160px">${r['Hotel Name']||'-'}</div></td>
+    <td style="font-size:11px;color:var(--text-muted)">${r.Source||'-'}</td>
+    <td><div class="links-cell">
+      ${r.URL ? `<a href="${r.URL}" target="_blank" rel="noopener noreferrer" class="link-btn">🏨 Hotel</a>` : ''}
+      ${isCarDest
+        ? `<span class="link-btn" style="cursor:default;pointer-events:none">🚗 Carro</span>`
+        : (r.url_flight ? `<a href="${r.url_flight}" target="_blank" rel="noopener noreferrer" class="link-btn">✈️ Voo</a>` : '')}
+    </div></td>
+    <td><span class="badge-file ${r._is_latest?'is-latest':''}">${r._file_date}</span></td>
+  </tr>`;
+}
+
+function rowV(r) {
+  const preco = parsePrice(r['PREÇO']);
+  const milhas = parsePrice(r['MILHAS']);
+  const isDireto = (r.ESCALA||'').split('\n')[0].toLowerCase().trim() === 'direto' ||
+                   (r.ESCALA||'').split('\n')[0].toLowerCase().includes('sem escala');
+
+  // Compute dias at render time — fallback if _dias missing
+  let diasDisplay = '-';
+  if (r._dias) {
+    diasDisplay = r._dias + 'd';
+  } else {
+    const ida  = r.DATA_DE_IDA  || '';
+    const volta = r.DATA_VOLTA  || '';
+    if (ida && volta && ida !== '-' && volta !== '-') {
+      const toISO = s => {
+        if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.substring(0,10);
+        const m = s.match(/^(\d{2})-(\d{2})-(\d{2,4})$/);
+        if (m) { let y=parseInt(m[3]); if(y<100)y+=2000; return `${y}-${m[2]}-${m[1]}`; }
+        return null;
+      };
+      const idaISO   = toISO(ida);
+      const voltaISO = toISO(volta);
+      if (idaISO && voltaISO) {
+        const d1 = new Date(idaISO + 'T12:00:00');
+        const d2 = new Date(voltaISO + 'T12:00:00');
+        if (!isNaN(d1) && !isNaN(d2)) {
+          const diff = Math.round((d2 - d1) / 86400000);
+          if (diff > 0) diasDisplay = diff + 'd';
+        }
+      }
+    }
+  }
+
+  // Day of week helper
+  const DIAS_SEMANA = ['dom','seg','ter','qua','qui','sex','sáb'];
+  const fmtDow = iso => {
+    if (!iso || iso === '-') return '';
+    const d = new Date(iso.substring(0,10) + 'T12:00:00');
+    return isNaN(d) ? '' : DIAS_SEMANA[d.getDay()];
+  };
+
+  // Link source label from URL
+  const urlSource = url => {
+    if (!url) return '';
+    if (url.includes('google.com'))      return 'Google';
+    if (url.includes('latamairlines.com')) return 'Latam';
+    return '';
+  };
+
+  const idaISO   = r.DATA_DE_IDA  || '';
+  const voltaRaw = r.DATA_VOLTA   || '';
+  const voltaISO = (!voltaRaw || voltaRaw === '-' || voltaRaw.toLowerCase() === 'unknown') ? '' : voltaRaw;
+  const idaDow   = fmtDow(idaISO);
+  const voltaDow = fmtDow(voltaISO);
+  const srcLabel = urlSource(r.URL);
+
+  return `<tr>
+    <td><div class="price-final">R$ ${fmtN(preco)}</div></td>
+    <td style="font-family:var(--mono);font-size:12px;font-weight:700">${r.DE||'-'}</td>
+    <td><span class="badge-dest voo">${r.PARA||'?'}</span></td>
+    <td><div style="font-size:12px">${r.CIDADE||'-'}</div><small style="color:var(--text-dim)">${r['PAÍS']||''}</small></td>
+    <td>${(()=>{ const v=r.DATA_VOLTA||''; const ok=v&&v!=='-'&&v.toLowerCase()!=='unknown'; return ok?'<span style="font-size:11px;padding:2px 8px;border-radius:4px;background:#e8f0ff;color:#0052cc;font-weight:500">Ida e Volta</span>':'<span style="font-size:11px;padding:2px 8px;border-radius:4px;background:#f7f8fa;color:#5a6072">Apenas Ida</span>'; })()}</td>
+    <td style="font-family:var(--mono);font-size:12px"><div>${fmtDate(idaISO)}</div></td>
+    <td style="font-family:var(--mono);font-size:12px;color:var(--text-muted)"><div>${voltaISO ? fmtDate(voltaISO) : '-'}</div></td>
+    <td style="font-family:var(--mono);font-size:12px;color:var(--text-muted)">${diasDisplay}</td>
+    <td style="font-family:var(--mono);font-size:12px">${r.HORÁRIO||'-'}</td>
+    <td><span class="badge-escala ${isDireto?'direto':'escala'}">${(r.ESCALA||'-').split('\n')[0].trim()}</span></td>
+    <td style="font-family:var(--mono);font-size:12px;color:var(--text-muted)">${milhas ? fmtN(milhas) : '-'}</td>
+    <td>${r.URL?`<div><a href="${r.URL}" target="_blank" rel="noopener noreferrer" class="link-btn">✈️ Ver voo</a></div><small style="color:var(--text-dim);font-size:12px">${srcLabel}</small>`:'-'}</td>
+    <td><span class="badge-file ${r._is_latest?'is-latest':''}">${r._file_date}</span></td>
+  </tr>`;
+}
+
+function updateStatus() {
+  const label = state.mode === 'hoteis' ? 'cidades' : 'destinos';
+  const modeNote = state.mode === 'voos' ? ' · <span style="color:var(--accent-v)">último arquivo</span>' : '';
+  const statusHTML = `<b>${state.files.length}</b> arquivo(s)${modeNote} · <b>${state.allRows.length}</b> registros · <b>${getDests().length}</b> ${label}`;
+  // StatsBar abaixo da paginação — única aparição
+  const sb = document.getElementById('statsBar');
+  if (sb) {
+    sb.style.display = state.files.length ? 'flex' : 'none';
+    sb.innerHTML = statusHTML;
+  }
+}
+
+// ── ACTIONS ────────────────────────────────────────────────────────────────
+function setSort(col) {
+  if (state.sortCol === col) state.sortAsc = !state.sortAsc;
+  else { state.sortCol = col; state.sortAsc = true; }
+  renderSortBar(); renderTable();
+}
+document.getElementById('searchInput').addEventListener('input', e => { state.search = e.target.value; state.currentPage = 0;
+    // Debounce: espera 220ms após última tecla antes de filtrar
+    clearTimeout(window._searchDebounce);
+    window._searchDebounce = setTimeout(() => {
+      _invalidateCountCache();
+      renderTable(); updateStatus(); maybeRenderMap();
+    }, 220);
+  });
+
+function toggleDiasFilter() {
+  const section = document.getElementById('diasFilterSection');
+  const body = document.getElementById('diasFilterBody');
+  const arrow = document.getElementById('diasFilterArrow');
+  section._open = !section._open;
+  body.style.display = section._open ? '' : 'none';
+  if (arrow) arrow.classList.toggle('open', section._open);
+}
+
+
+// ── DATE FILTER HELPERS ────────────────────────────────────────────────────
+function getRowDate(row, key) {
+  const raw = row[key] || '';
+  if (!raw || raw === '-') return null;
+  // Already formatted "02/abr/2026"
+  if (/^\d{2}\/[a-z]{3}\/\d{4}$/i.test(raw)) {
+    const [d, m, y] = raw.split('/');
+    const mi = MESES.indexOf(m.toLowerCase());
+    if (mi < 0) return null;
+    return new Date(parseInt(y), mi, parseInt(d));
+  }
+  // ISO
+  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return new Date(raw.substring(0,10)+'T12:00:00');
+  // Google format "2abr5abr" — use parsed _ida_fmt if available
+  const fmt = row['_ida_fmt'] || '';
+  if (/^\d{2}\/[a-z]{3}\/\d{4}$/i.test(fmt)) {
+    const [d, m, y] = fmt.split('/');
+    const mi = MESES.indexOf(m.toLowerCase());
+    if (mi < 0) return null;
+    return new Date(parseInt(y), mi, parseInt(d));
+  }
+  return null;
+}
+
+function getAvailableMonths() {
+  const dateKey = state.mode === 'hoteis' ? 'Checkin_Date' : 'DATA_DE_IDA';
+  // Use all filtered rows (ignoring month/day filter) so months react to other filters
+  const rows = getAllFiltered({ selectedMonth: 'ALL', selectedDays: [] });
+  const months = new Set();
+  for (const row of rows) {
+    const d = getRowDate(row, dateKey);
+    if (d) months.add(MESES[d.getMonth()] + '/' + d.getFullYear());
+  }
+  return [...months].sort((a, b) => {
+    const [ma, ya] = a.split('/'); const [mb, yb] = b.split('/');
+    const da = new Date(ya, MESES.indexOf(ma), 1);
+    const db = new Date(yb, MESES.indexOf(mb), 1);
+    return da - db;
+  });
+}
+
+function getAvailableDays(month) {
+  const dateKey = state.mode === 'hoteis' ? 'Checkin_Date' : 'DATA_DE_IDA';
+  // Use filtered rows (ignoring day filter) so days react to other filters + selected month
+  const rows = getAllFiltered({ selectedDays: [] });
+  const days = new Set();
+  for (const row of rows) {
+    const d = getRowDate(row, dateKey);
+    if (!d) continue;
+    const mon = MESES[d.getMonth()] + '/' + d.getFullYear();
+    if (mon === month) days.add(String(d.getDate()).padStart(2,'0'));
+  }
+  return [...days].sort();
+}
+
+function renderDateFilter() {
+  const section = document.getElementById('dateSection');
+  const months = getAvailableMonths();
+  if (!months.length) { section.style.display = 'none'; return; }
+  section.style.display = 'block';
+
+  // On mobile start collapsed, on desktop start open
+  const isMobile = window.innerWidth <= 768;
+  if (!section._initialized) {
+    section._initialized = true;
+    section._open = false; // sempre começa fechado
+    const body = document.getElementById('dateFilterBody');
+    const arrow = document.getElementById('dateArrow');
+    body.style.display = 'none';
+    if (arrow) arrow.classList.remove('open');
+  }
+
+  // Month buttons
+  const mg = document.getElementById('monthGrid');
+  mg.innerHTML =
+    `<button class="city-btn all-btn ${state.selectedMonth==='ALL'?'active':''}" onclick="selectMonth('ALL')">TODOS</button>` +
+    months.map(m => {
+      const [mon, yr] = m.split('/');
+      return `<button class="city-btn ${state.selectedMonth===mon?'active':''}" onclick="selectMonth('${mon}')">${mon}<br><span style="font-size:9px;opacity:0.6">${yr}</span></button>`;
+    }).join('');
+
+  // Day buttons — only show if month selected
+  const dg = document.getElementById('dayGrid');
+  const dbg = document.getElementById('dayBtnGrid');
+  if (state.selectedMonth === 'ALL') {
+    dg.style.display = 'none';
+  } else {
+    const selMonYear = months.find(m => m.startsWith(state.selectedMonth+'/')) || '';
+    const days = getAvailableDays(selMonYear);
+    dg.style.display = days.length ? '' : 'none';
+    dbg.innerHTML =
+      `<button class="city-btn all-btn ${state.selectedDays.length===0?'active':''}" onclick="selectDay('ALL')">TODOS</button>` +
+      days.map(d => `<button class="city-btn ${state.selectedDays.includes(d)?'active':''}" onclick="selectDay('${d}')">${d}</button>`).join('');
+  }
+}
+
+function selectMonth(mon) {
+  state.selectedMonth = mon;
+  state.selectedDays = [];
+  state.currentPage = 0;
+  _invalidateCountCache();
+  debouncedRender();
+}
+
+function selectDay(day) {
+  if (day === 'ALL') {
+    state.selectedDays = [];
+  } else {
+    const idx = state.selectedDays.indexOf(day);
+    if (idx === -1) {
+      state.selectedDays = [...state.selectedDays, day];
+    } else {
+      state.selectedDays = state.selectedDays.filter(d => d !== day);
+    }
+  }
+  state.currentPage = 0;
+  _invalidateCountCache();
+  debouncedRender();
+}
+
+function toggleDate() {
+  const section = document.getElementById('dateSection');
+  const body = document.getElementById('dateFilterBody');
+  const arrow = document.getElementById('dateArrow');
+  section._open = !section._open;
+  body.style.display = section._open ? '' : 'none';
+  if (arrow) arrow.classList.toggle('open', section._open);
+}
+
+function goPage(page) {
+  state.currentPage = page;
+  renderTable();
+  // Scroll to top of the table (not top of page) so user stays in results
+  const tableEl = document.getElementById('paginationBar') || document.getElementById('tableWrapEl');
+  if (tableEl) {
+    tableEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+
+
+function renderFeriadosFilter() {
+  initFeriadosOpen();
+  const grid = document.getElementById('feriadosGrid');
+  if (!grid) return;
+
+  // Sem counts — instantâneo
+  const allActive = state.feriadoFilter.length === 0;
+  const btnStyle = (active) => `
+    text-align:left;padding:7px 10px;border-radius:6px;font-size:12px;cursor:pointer;
+    border:1.5px solid ${active ? 'var(--mode-accent)' : 'var(--border)'};
+    background:${active ? 'var(--mode-light)' : '#fff'};
+    color:${active ? 'var(--mode-accent)' : 'var(--text-muted)'};
+    font-weight:${active ? '600' : '400'};
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;`;
+
+  const allBtn = `<button data-fidx="-1" style="${btnStyle(allActive)}">📅 Todas as datas</button>`;
+  const ferBtns = FERIADOS.map((o, i) => {
+    const isActive = state.feriadoFilter.includes(o.name);
+    return `<button data-fidx="${i}" style="${btnStyle(isActive)}">${o.name}</button>`;
+  }).join('');
+
+  grid.innerHTML = allBtn + ferBtns;
+
+  grid.querySelectorAll('button[data-fidx]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.getAttribute('data-fidx'));
+      if (idx === -1) { state.feriadoFilter = []; }
+      else {
+        const name = FERIADOS[idx].name;
+        const pos = state.feriadoFilter.indexOf(name);
+        if (pos >= 0) state.feriadoFilter.splice(pos, 1);
+        else state.feriadoFilter.push(name);
+      }
+      state.currentPage = 0;
+      debouncedRender();
+    });
+  });
+}
+
+let feriadosOpen = null; // null = not yet initialized
+function toggleFeriados() {
+  feriadosOpen = !feriadosOpen;
+  const body = document.getElementById('feriadosBody');
+  const arrow = document.getElementById('feriadosArrow');
+  body.style.display = feriadosOpen ? '' : 'none';
+  if (arrow) arrow.classList.toggle('open', feriadosOpen);
+}
+
+function initFeriadosOpen() {
+  if (feriadosOpen !== null) return;
+  feriadosOpen = false; // sempre começa fechado
+  const body = document.getElementById('feriadosBody');
+  const arrow = document.getElementById('feriadosArrow');
+  body.style.display = 'none';
+  if (arrow) arrow.classList.remove('open');
+}
+
+let regiaoOpen = null;
+function toggleRegiao() {
+  regiaoOpen = !regiaoOpen;
+  const body = document.getElementById('regiaoBody');
+  const arrow = document.getElementById('regiaoArrow');
+  body.style.display = regiaoOpen ? '' : 'none';
+  if (arrow) arrow.classList.toggle('open', regiaoOpen);
+}
+
+function initRegiaoOpen() {
+  if (regiaoOpen !== null) return;
+  regiaoOpen = false; // sempre começa fechado
+  const body = document.getElementById('regiaoBody');
+  const arrow = document.getElementById('regiaoArrow');
+  body.style.display = 'none';
+  if (arrow) arrow.classList.remove('open');
+}
+
+let idaVoltaOpen = null;
+function toggleIdaVolta() {
+  idaVoltaOpen = !idaVoltaOpen;
+  const body = document.getElementById('idaVoltaBody');
+  const arrow = document.getElementById('idaVoltaArrow');
+  if (body) body.style.display = idaVoltaOpen ? 'flex' : 'none';
+  if (arrow) arrow.classList.toggle('open', idaVoltaOpen);
+}
+
+function initIdaVoltaOpen() {
+  if (idaVoltaOpen !== null) return;
+  idaVoltaOpen = false; // sempre começa fechado
+  const body = document.getElementById('idaVoltaBody');
+  const arrow = document.getElementById('idaVoltaArrow');
+  if (body) body.style.display = 'none';
+  if (arrow) arrow.classList.remove('open');
+}
+
+function renderIdaVoltaFilter() {
+  const section = document.getElementById('idaVoltaSection');
+  if (!section) return;
+  if (state.mode !== 'voos') { section.style.display = 'none'; return; }
+  section.style.display = 'block';
+  initIdaVoltaOpen();
+
+  const grid = document.getElementById('idaVoltaGrid');
+  if (!grid) return;
+
+  // Sem counts — instantâneo
+  const opts = [
+    { val: 'ALL',      label: '↔️ Todos' },
+    { val: 'ida',      label: '➡️ Apenas Ida' },
+    { val: 'idavolta', label: '↩️ Ida e Volta' },
+  ];
+  const ivStyle = (active) => `
+    text-align:left;padding:7px 10px;border-radius:6px;font-size:12px;cursor:pointer;
+    border:1.5px solid ${active ? 'var(--mode-accent)' : 'var(--border)'};
+    background:${active ? 'var(--mode-light)' : '#fff'};
+    color:${active ? 'var(--mode-accent)' : 'var(--text-muted)'};
+    font-weight:${active ? '600' : '400'};`;
+  grid.innerHTML = opts.map(o => {
+    const isActive = state.idaVoltaFilter === o.val;
+    return `<button data-ivval="${o.val}" style="${ivStyle(isActive)}">${o.label}</button>`;
+  }).join('');
+  grid.querySelectorAll('button[data-ivval]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.idaVoltaFilter = btn.getAttribute('data-ivval');
+      state.currentPage = 0;
+      debouncedRender();
+    });
+  });
+}
+
+// ── REGIÃO MAP ────────────────────────────────────────────────────────────
+const REGIAO_MAP = {
+  'brasil':           ['brazil','brasil'],
+  'america_sul':      ['argentina','bolivia','chile','colombia','ecuador','french guiana','guyana','paraguay','peru','suriname','uruguay','venezuela'],
+  'america_central':  ['belize','costa rica','el salvador','guatemala','honduras','mexico','nicaragua','panama'],
+  'caribe':           ['antigua and barbuda','bahamas','barbados','cayman islands','cuba','dominica','dominican republic','haiti','jamaica','puerto rico','saint kitts and nevis','saint lucia','saint vincent and the grenadines','trinidad and tobago'],
+  'america_norte':    ['canada','united states','united states (hawai)','greenland'],
+  'europa':           ['albania','andorra','austria','belgium','bosnia and herzegovina','bulgaria','croatia','cyprus','czech republic','denmark','estonia','finland','france','germany','greece','hungary','iceland','ireland','isle of man','italy','kosovo','latvia','liechtenstein','lithuania','luxembourg','malta','moldova','monaco','montenegro','netherlands','north macedonia','norway','poland','portugal','romania','russia','serbia','slovakia','slovenia','spain','sweden','switzerland','ukraine','united kingdom'],
+  'asia':             ['afghanistan','armenia','azerbaijan','bangladesh','brunei','cambodia','china','georgia','hong kong','india','indonesia','japan','kazakhstan','kyrgyzstan','laos','macau','malaysia','maldives','mongolia','myanmar','nepal','north korea','pakistan','palau','philippines','singapore','south korea','sri lanka','taiwan','tajikistan','thailand','timor-leste','turkey','turkmenistan','uzbekistan','vietnam'],
+  'oceania':          ['australia','cook islands','fiji','kiribati','marshall islands','micronesia','new caledonia (france)','new zealand','papua new guinea','samoa','solomon islands','tonga','tuvalu','vanuatu'],
+  'africa':           ['algeria','angola','benin','botswana','burkina faso','burundi','cabo ocidental','cameroon','cape verde','central african republic','chad','comoros','democratic republic of the congo','djibouti','egypt','eritrea','eswatini','ethiopia','gabon','gambia','ghana','guinea','guinea-bissau','guine equatorial','kenya','lesotho','liberia','libya','madagascar','malawi','mali','mauritania','mauritius','morocco','mozambique','namibia','niger','nigeria','republic of the congo','rwanda','são tomé and príncipe','senegal','seychelles','sierra leone','somalia','south africa','south sudan','sudan','tanzania','togo','tunisia','uganda','zambia','zimbabwe'],
+  'oriente_medio':    ['bahrain','iran','iraq','israel','jordan','kuwait','lebanon','oman','qatar','saudi arabia','syria','united arab emirates','yemen'],
+};
+
+function getRowRegiao(r) {
+  const raw = (r['PAÍS'] || r['Country'] || '').trim().toLowerCase();
+  if (!raw) return null;
+  for (const [reg, countries] of Object.entries(REGIAO_MAP)) {
+    if (countries.includes(raw)) return reg;
+  }
+  return null;
+}
+
+function renderRegiaoFilter() {
+  initRegiaoOpen();
+  const grid = document.getElementById('regiaoGrid');
+  if (!grid) return;
+  const opts = [
+    { val: 'brasil',          label: '🇧🇷 Brasil' },
+    { val: 'america_sul',     label: '🌎 América do Sul' },
+    { val: 'america_central', label: '🌎 América Central' },
+    { val: 'caribe',          label: '🏝️ Caribe' },
+    { val: 'america_norte',   label: '🌎 América do Norte' },
+    { val: 'europa',          label: '🇪🇺 Europa' },
+    { val: 'asia',            label: '🌏 Ásia' },
+    { val: 'oceania',         label: '🌊 Oceania' },
+    { val: 'africa',          label: '🌍 África' },
+    { val: 'oriente_medio',   label: '🕌 Oriente Médio' },
+  ];
+
+  // Sem counts — instantâneo
+  const allActive = state.regiaoFilter.length === 0;
+  const rStyle = (active) => `
+    text-align:left;padding:7px 10px;border-radius:6px;font-size:12px;cursor:pointer;
+    border:1.5px solid ${active ? 'var(--mode-accent)' : 'var(--border)'};
+    background:${active ? 'var(--mode-light)' : '#fff'};
+    color:${active ? 'var(--mode-accent)' : 'var(--text-muted)'};
+    font-weight:${active ? '600' : '400'};`;
+
+  const allBtn = `<button data-rval="ALL" style="${rStyle(allActive)}">🌐 Todos</button>`;
+  const regBtns = opts.map(o => {
+    const isActive = state.regiaoFilter.includes(o.val);
+    return `<button data-rval="${o.val}" style="${rStyle(isActive)}">${o.label}</button>`;
+  }).join('');
+
+  grid.innerHTML = allBtn + regBtns;
+
+  grid.querySelectorAll('button[data-rval]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const val = btn.getAttribute('data-rval');
+      if (val === 'ALL') {
+        state.regiaoFilter = [];
+      } else {
+        const pos = state.regiaoFilter.indexOf(val);
+        if (pos >= 0) state.regiaoFilter.splice(pos, 1);
+        else state.regiaoFilter.push(val);
+      }
+      state.currentPage = 0;
+      debouncedRender();
+    });
+  });
+}
+
+window.setSort = setSort;
+window.switchMode = switchMode;
+window.enterMode = enterMode;
+window.toggleDiasFilter = toggleDiasFilter;
+window.toggleDate = toggleDate;
+window.toggleFeriados = toggleFeriados;
+window.toggleRegiao = toggleRegiao;
+window.toggleIdaVolta = toggleIdaVolta;
+window.selectMonth = selectMonth;
+window.selectDay = selectDay;
+window.goPage = goPage;
+window.toggleArquivos = toggleArquivos;
+
+function toggleStickyHeader() {
+  const isOn = document.body.classList.toggle('sticky-header');
+  const btn = document.getElementById('stickyToggleBtn');
+  if (btn) {
+    btn.textContent = isOn ? '📌 Header On' : '📌 Header Off';
+    btn.classList.toggle('active', isOn);
+  }
+  // Reset scroll position when toggling off
+  if (!isOn) {
+    const wrap = document.getElementById('tableWrapEl');
+    if (wrap) wrap.scrollTop = 0;
+  }
+}
+window.toggleStickyHeader = toggleStickyHeader;
+
+// ── IATA COORDINATES ──────────────────────────────────────────────────────
+const IATA_COORDS = {
+'AAE':[36.82,7.81],
+'AAL':[57.09,9.85],
+'AAM':[-24.99,31.54],
+'AAR':[56.3,10.62],
+'AAT':[47.75,88.08],
+'ABE':[40.65,-75.44],
+'ABI':[32.41,-99.68],
+'ABJ':[5.26,-3.93],
+'ABK':[7.32,45.15],
+'ABQ':[35.04,-106.61],
+'ABS':[22.37,31.61],
+'ABT':[20.3,41.63],
+'ABV':[9.01,7.27],
+'ABZ':[57.2,-2.2],
+'ACA':[16.76,-99.75],
+'ACC':[5.6,-0.17],
+'ACE':[28.95,-13.61],
+'ACK':[41.25,-70.06],
+'ACT':[31.61,-97.23],
+'ACV':[40.98,-124.11],
+'ADA':[36.98,35.28],
+'ADB':[38.29,27.16],
+'ADD':[8.98,38.8],
+'ADF':[37.73,38.47],
+'ADL':[-34.95,138.53],
+'ADZ':[12.58,-81.71],
+'AEP':[-34.56,-58.42],
+'AER':[43.45,39.95],
+'AES':[62.56,6.11],
+'AFA':[-34.58,-68.4],
+'AGA':[30.38,-9.41],
+'AGH':[56.3,12.85],
+'AGP':[36.67,-4.5],
+'AGS':[33.37,-81.96],
+'AGU':[21.71,-102.32],
+'AHB':[18.24,42.66],
+'AHO':[40.63,8.29],
+'AHU':[35.17,-3.84],
+'AJF':[29.79,40.1],
+'AJI':[39.65,43.0],
+'AJU':[-10.98,-37.07],
+'AKJ':[43.67,142.45],
+'AKL':[-37.01,174.79],
+'AKN':[58.68,-156.65],
+'AKS':[-8.7,160.68],
+'AKU':[41.26,86.13],
+'ALB':[42.75,-73.8],
+'ALC':[38.28,-0.56],
+'ALF':[70.07,25.02],
+'ALG':[36.69,3.22],
+'ALO':[42.55,-92.4],
+'ALP':[36.18,37.23],
+'ALW':[46.09,-118.29],
+'AMA':[35.22,-101.71],
+'AMD':[23.07,72.63],
+'AMH':[5.86,37.59],
+'AMM':[31.72,35.99],
+'AMQ':[-3.71,128.09],
+'AMS':[52.31,4.76],
+'ANC':[61.17,-150.02],
+'ANE':[47.56,-0.31],
+'ANF':[-23.44,-70.44],
+'ANR':[51.19,4.46],
+'AOE':[39.81,30.52],
+'AOI':[43.62,13.36],
+'AOJ':[40.73,140.69],
+'AOR':[6.19,100.4],
+'APL':[-15.1,39.28],
+'APN':[45.08,-83.56],
+'APW':[-13.83,-172.0],
+'APY':[-2.9,-41.73],
+'AQA':[-21.81,-48.14],
+'AQI':[28.33,46.12],
+'AQJ':[29.61,35.02],
+'AQP':[-16.34,-71.58],
+'ARI':[-18.35,-70.34],
+'ARK':[-3.36,36.63],
+'ARM':[-30.53,151.62],
+'ARN':[59.65,17.92],
+'ARU':[-21.14,-50.42],
+'ARW':[46.17,21.26],
+'ASE':[39.22,-106.87],
+'ASJ':[28.43,129.71],
+'ASM':[15.29,38.91],
+'ASO':[9.63,41.86],
+'ASP':[-23.81,133.9],
+'ASR':[38.77,35.47],
+'ASU':[-25.24,-57.52],
+'ASW':[23.97,32.82],
+'ATH':[37.94,23.95],
+'ATL':[33.64,-84.43],
+'ATQ':[31.71,74.8],
+'ATW':[44.26,-88.52],
+'ATY':[44.91,-97.15],
+'ATZ':[27.04,31.02],
+'AUA':[12.5,-70.01],
+'AUC':[7.07,-70.74],
+'AUH':[24.43,54.65],
+'AUR':[44.89,2.42],
+'AUS':[30.19,-97.67],
+'AUX':[-7.23,-48.24],
+'AVL':[35.44,-82.54],
+'AVN':[43.91,4.9],
+'AWA':[6.97,38.46],
+'AXA':[18.2,-63.06],
+'AXD':[40.86,26.02],
+'AXT':[39.61,140.22],
+'AXU':[14.15,38.77],
+'AYP':[-13.15,-74.2],
+'AYQ':[-25.19,130.98],
+'AYT':[36.9,30.8],
+'AZS':[19.27,-69.74],
+'BAH':[26.27,50.64],
+'BAL':[37.93,41.12],
+'BAQ':[10.89,-74.78],
+'BAR':[19.07,110.46],
+'BAV':[40.56,109.99],
+'BAY':[47.66,23.47],
+'BBA':[-45.96,-71.69],
+'BBK':[-17.83,25.16],
+'BCD':[10.64,122.93],
+'BCI':[-23.44,145.09],
+'BCN':[41.3,2.08],
+'BDB':[-24.91,152.32],
+'BDJ':[-3.44,114.76],
+'BDL':[41.94,-72.68],
+'BDQ':[22.34,73.23],
+'BDS':[40.66,17.94],
+'BEG':[44.82,20.31],
+'BEL':[-1.38,-48.48],
+'BER':[52.37,13.5],
+'BES':[48.45,-4.42],
+'BET':[60.78,-161.84],
+'BEW':[-20.0,34.92],
+'BEY':[33.82,35.49],
+'BFF':[41.87,-103.6],
+'BFL':[35.43,-119.06],
+'BFN':[-29.09,26.3],
+'BGA':[7.13,-73.18],
+'BGF':[4.4,18.52],
+'BGG':[38.86,40.6],
+'BGI':[13.07,-59.49],
+'BGO':[60.29,5.22],
+'BGT':[33.26,44.22],
+'BGY':[45.67,9.7],
+'BHB':[44.45,-68.36],
+'BHD':[54.62,-5.87],
+'BHI':[-38.73,-62.17],
+'BHJ':[23.29,69.67],
+'BHO':[23.29,77.34],
+'BHQ':[-32.0,141.47],
+'BHS':[-33.41,149.72],
+'BHX':[52.45,-1.75],
+'BHY':[21.54,109.29],
+'BIL':[45.81,-108.54],
+'BIM':[25.7,-79.27],
+'BIO':[43.3,-2.91],
+'BIQ':[43.47,-1.52],
+'BIS':[46.77,-100.75],
+'BJA':[36.71,5.07],
+'BJL':[13.34,-16.65],
+'BJM':[-3.32,29.32],
+'BJR':[11.61,37.32],
+'BJV':[37.25,27.66],
+'BJZ':[38.89,-6.82],
+'BKI':[6.12,116.06],
+'BKK':[13.69,100.75],
+'BKO':[12.53,-7.95],
+'BKS':[-3.86,102.34],
+'BKZ':[-1.33,31.82],
+'BLL':[55.74,9.15],
+'BLQ':[44.54,11.29],
+'BLR':[13.2,77.71],
+'BME':[-17.95,122.23],
+'BMV':[12.67,108.12],
+'BMW':[19.82,1.38],
+'BND':[27.22,56.38],
+'BNE':[-27.38,153.12],
+'BNK':[-28.84,153.56],
+'BNN':[65.46,12.22],
+'BOB':[-16.44,-151.75],
+'BOD':[44.83,-0.72],
+'BOG':[4.7,-74.15],
+'BOI':[43.56,-116.22],
+'BOJ':[42.57,27.5],
+'BOM':[19.09,72.87],
+'BON':[12.13,-68.27],
+'BOO':[67.27,14.37],
+'BOS':[42.36,-71.01],
+'BPN':[1.27,117.43],
+'BPS':[-16.44,-39.08],
+'BPT':[30.07,-94.02],
+'BQB':[-33.69,115.4],
+'BQN':[18.49,-67.13],
+'BRA':[-12.08,-44.99],
+'BRC':[-41.15,-71.16],
+'BRD':[46.4,-94.14],
+'BRE':[53.04,8.79],
+'BRI':[41.14,16.76],
+'BRM':[10.05,-69.36],
+'BRN':[46.91,7.5],
+'BRS':[51.38,-2.72],
+'BRU':[50.9,4.48],
+'BRW':[71.28,-156.77],
+'BSA':[11.28,49.15],
+'BSB':[-15.87,-47.92],
+'BSK':[34.79,5.74],
+'BSL':[47.59,7.53],
+'BSO':[20.45,121.98],
+'BSR':[30.55,47.66],
+'BTJ':[5.52,95.42],
+'BTM':[45.95,-112.5],
+'BTR':[30.53,-91.15],
+'BTU':[3.12,113.05],
+'BTV':[44.47,-73.15],
+'BUA':[-5.43,154.67],
+'BUD':[47.44,19.26],
+'BUF':[42.94,-78.73],
+'BUQ':[-20.02,28.62],
+'BUR':[34.2,-118.36],
+'BUS':[41.61,41.6],
+'BUZ':[28.94,50.84],
+'BVB':[2.84,-60.69],
+'BVE':[45.15,1.47],
+'BWI':[39.18,-76.67],
+'BWK':[43.29,16.68],
+'BWT':[-41.08,145.73],
+'BXG':[-36.75,144.05],
+'BXU':[8.95,125.48],
+'BYC':[-21.99,-63.63],
+'BYK':[7.74,-4.95],
+'BYO':[-21.12,-56.52],
+'BZE':[17.54,-88.3],
+'BZG':[53.1,18.01],
+'BZL':[22.8,90.3],
+'BZN':[45.78,-111.15],
+'CAB':[-5.59,12.19],
+'CAC':[-25.0,-53.5],
+'CAG':[39.25,9.06],
+'CAI':[30.12,31.41],
+'CAK':[40.92,-81.44],
+'CAN':[23.39,113.3],
+'CAP':[19.73,-72.19],
+'CAW':[6.17,1.25],
+'CAY':[4.82,-52.37],
+'CBB':[-17.42,-66.18],
+'CBH':[31.65,-2.11],
+'CBO':[7.16,124.21],
+'CBR':[-35.31,149.19],
+'CCC':[22.46,-78.33],
+'CCK':[-12.19,96.84],
+'CCS':[10.6,-66.99],
+'CCU':[22.65,88.45],
+'CDG':[49.01,2.55],
+'CDT':[39.99,-0.07],
+'CEB':[10.31,123.98],
+'CEI':[19.95,99.88],
+'CEN':[27.39,-109.83],
+'CEP':[-36.78,-72.04],
+'CFB':[-22.92,-42.07],
+'CFE':[45.79,3.16],
+'CFN':[54.93,-8.34],
+'CFR':[49.18,-0.45],
+'CFU':[39.6,19.91],
+'CGB':[-15.65,-56.12],
+'CGD':[28.92,111.64],
+'CGH':[-23.62,-46.66],
+'CGK':[-6.13,106.65],
+'CGP':[22.25,91.81],
+'CGR':[-20.47,-54.67],
+'CGY':[8.66,124.61],
+'CHA':[35.04,-85.2],
+'CHC':[-43.49,172.53],
+'CHG':[41.54,120.44],
+'CHO':[38.14,-78.45],
+'CHQ':[35.53,24.15],
+'CID':[41.88,-91.71],
+'CIH':[36.25,113.12],
+'CIJ':[-11.04,-68.78],
+'CIX':[-6.79,-79.83],
+'CJA':[-7.14,-78.49],
+'CJC':[-22.5,-68.9],
+'CJJ':[36.72,127.5],
+'CJS':[31.64,-106.43],
+'CJU':[33.51,126.49],
+'CKG':[29.72,106.64],
+'CKS':[-6.11,-50.0],
+'CKY':[9.57,-13.61],
+'CLE':[41.41,-81.85],
+'CLJ':[46.78,23.69],
+'CLL':[30.59,-96.36],
+'CLO':[3.54,-76.38],
+'CLQ':[19.27,-103.58],
+'CLT':[35.21,-80.94],
+'CLV':[-17.72,-48.61],
+'CMB':[7.18,79.88],
+'CME':[18.65,-91.8],
+'CMF':[45.64,5.88],
+'CMH':[39.99,-82.89],
+'CMI':[40.04,-88.28],
+'CMN':[33.37,-7.59],
+'CMW':[21.42,-77.85],
+'CND':[44.36,28.49],
+'CNF':[-19.63,-43.97],
+'CNJ':[-24.8,148.01],
+'CNQ':[-27.45,-58.76],
+'CNS':[-16.89,145.75],
+'CNX':[18.77,98.96],
+'COD':[44.52,-109.02],
+'COK':[10.15,76.4],
+'COO':[6.36,2.38],
+'COR':[-31.32,-64.21],
+'COS':[38.81,-104.7],
+'CPE':[19.82,-90.5],
+'CPH':[55.62,12.66],
+'CPO':[-27.29,-70.78],
+'CPQ':[-23.0,-47.13],
+'CPT':[-33.96,18.6],
+'CPV':[-7.27,-35.9],
+'CPX':[18.31,-65.3],
+'CRD':[-45.79,-67.47],
+'CRM':[12.52,124.63],
+'CRP':[27.77,-97.5],
+'CRW':[38.37,-81.59],
+'CSX':[28.19,113.22],
+'CTA':[37.47,15.07],
+'CTC':[-28.59,-65.75],
+'CTG':[10.45,-75.52],
+'CTM':[18.5,-88.33],
+'CTS':[42.77,141.69],
+'CTU':[30.58,103.95],
+'CUC':[7.93,-72.51],
+'CUE':[-2.89,-78.98],
+'CUL':[24.76,-107.47],
+'CUN':[21.04,-86.87],
+'CUR':[12.2,-68.96],
+'CUU':[28.7,-106.0],
+'CUZ':[-13.54,-71.94],
+'CVG':[39.05,-84.67],
+'CWA':[44.78,-89.67],
+'CWB':[-25.53,-49.17],
+'CXB':[21.45,91.96],
+'CXJ':[-29.2,-51.19],
+'CYB':[19.69,-79.88],
+'CYP':[11.61,124.54],
+'CYS':[41.16,-104.81],
+'CYZ':[16.93,121.77],
+'CZL':[36.28,6.62],
+'CZM':[20.52,-86.93],
+'CZS':[-7.6,-72.77],
+'CZX':[31.92,119.78],
+'DAB':[29.18,-81.06],
+'DAC':[23.84,90.4],
+'DAD':[16.04,108.2],
+'DAM':[33.41,36.52],
+'DAR':[-6.88,39.2],
+'DAT':[40.06,113.48],
+'DAU':[-9.09,143.21],
+'DAV':[8.39,-82.43],
+'DAY':[39.9,-84.22],
+'DBO':[-32.22,148.57],
+'DBV':[42.56,18.27],
+'DCA':[38.85,-77.04],
+'DCM':[43.56,2.37],
+'DDG':[40.02,124.29],
+'DEB':[47.49,21.62],
+'DEC':[39.83,-88.87],
+'DED':[30.19,78.18],
+'DEL':[28.56,77.1],
+'DEM':[8.78,34.86],
+'DEN':[39.86,-104.67],
+'DFW':[32.9,-97.04],
+'DGO':[24.12,-104.53],
+'DGT':[9.33,123.3],
+'DHN':[31.32,-85.45],
+'DIJ':[-2.58,140.52],
+'DIK':[46.8,-102.8],
+'DIL':[-8.54,125.52],
+'DIR':[9.63,41.86],
+'DIY':[37.89,40.2],
+'DJB':[-1.64,103.64],
+'DJE':[33.87,10.78],
+'DJG':[24.29,9.45],
+'DJJ':[-2.58,140.52],
+'DKR':[14.74,-17.49],
+'DLA':[4.01,9.71],
+'DLC':[38.97,121.54],
+'DLG':[59.04,-158.51],
+'DLH':[46.84,-92.19],
+'DLI':[11.75,108.37],
+'DLM':[36.71,28.79],
+'DLU':[25.64,100.32],
+'DLZ':[43.59,104.43],
+'DMK':[13.91,100.61],
+'DMM':[26.47,49.8],
+'DNZ':[37.79,29.1],
+'DOD':[-6.18,35.75],
+'DOH':[25.27,51.61],
+'DOM':[15.55,-61.3],
+'DOU':[-22.2,-54.93],
+'DOY':[37.51,118.79],
+'DPL':[8.6,123.34],
+'DPS':[-8.75,115.17],
+'DQA':[46.75,125.0],
+'DRS':[51.13,13.77],
+'DRW':[-12.41,130.88],
+'DSE':[11.08,39.72],
+'DSI':[30.35,-86.47],
+'DSM':[41.53,-93.66],
+'DTM':[51.52,7.61],
+'DTW':[42.21,-83.35],
+'DUB':[53.42,-6.27],
+'DUD':[-45.93,170.2],
+'DUR':[-29.97,30.95],
+'DUS':[51.29,6.77],
+'DVL':[48.11,-98.91],
+'DVO':[7.13,125.65],
+'DXB':[25.25,55.37],
+'DZA':[-12.8,45.28],
+'EAR':[40.73,-99.01],
+'EAU':[44.87,-91.48],
+'EBB':[0.04,32.44],
+'EBH':[32.57,-0.5],
+'EBJ':[55.53,8.55],
+'EBL':[36.23,43.96],
+'ECP':[30.36,-85.8],
+'EDI':[55.95,-3.37],
+'EDO':[39.55,27.01],
+'EEA':[-27.79,-50.28],
+'EFL':[38.12,20.5],
+'EGC':[44.82,0.52],
+'EGE':[39.64,-106.92],
+'EGL':[4.65,39.62],
+'EGM':[-8.56,157.86],
+'EIN':[51.45,5.39],
+'EJA':[7.02,-73.81],
+'EKO':[40.83,-115.79],
+'ELH':[25.47,-76.69],
+'ELP':[31.81,-106.38],
+'ELQ':[26.3,43.77],
+'ELS':[-33.03,27.83],
+'ELU':[33.51,6.79],
+'EMD':[-23.57,148.18],
+'ENC':[48.69,6.23],
+'ENU':[6.47,7.56],
+'EQS':[-42.91,-71.14],
+'ERC':[39.71,39.53],
+'ERF':[50.98,10.96],
+'ERI':[42.08,-80.18],
+'ERZ':[39.96,41.17],
+'ESB':[40.13,32.99],
+'ESM':[0.98,-79.63],
+'EUA':[-21.38,-174.96],
+'EUG':[44.13,-123.21],
+'EUN':[27.15,-13.22],
+'EUX':[17.49,-62.98],
+'EVN':[40.15,44.4],
+'EVV':[37.83,-87.53],
+'EWN':[35.07,-77.04],
+'EWR':[40.69,-74.17],
+'EXM':[-21.58,114.1],
+'EXT':[50.73,-3.41],
+'EYP':[5.32,-72.38],
+'EYW':[24.56,-81.76],
+'EZE':[-34.82,-58.54],
+'EZS':[38.61,39.29],
+'FAI':[64.82,-147.86],
+'FAO':[37.02,-7.97],
+'FAR':[46.92,-96.82],
+'FAT':[36.78,-119.72],
+'FAV':[-16.05,-145.66],
+'FAY':[34.99,-78.88],
+'FBM':[11.59,27.54],
+'FCA':[48.31,-114.26],
+'FCO':[41.8,12.25],
+'FDE':[61.39,5.76],
+'FDF':[14.59,-61.0],
+'FEN':[-3.86,-32.42],
+'FEZ':[33.93,-4.98],
+'FKB':[48.78,8.08],
+'FKI':[0.48,25.34],
+'FLL':[26.07,-80.15],
+'FLM':[39.87,-75.24],
+'FLN':[-27.67,-48.55],
+'FLR':[43.81,11.2],
+'FMA':[-26.21,-58.23],
+'FMO':[52.13,7.68],
+'FNA':[8.62,-13.19],
+'FNC':[32.7,-16.78],
+'FNT':[42.97,-83.74],
+'FOC':[26.0,119.66],
+'FOD':[42.55,-94.19],
+'FOR':[-3.78,-38.53],
+'FPO':[26.56,-78.7],
+'FRA':[50.03,8.57],
+'FRO':[61.59,5.02],
+'FRS':[16.91,-89.87],
+'FRW':[-21.16,27.47],
+'FSD':[43.58,-96.74],
+'FSM':[35.34,-94.37],
+'FTE':[-50.33,-72.05],
+'FUE':[28.45,-13.86],
+'FUK':[33.58,130.45],
+'FUN':[-8.52,179.2],
+'FWA':[40.98,-85.2],
+'GAJ':[38.41,140.37],
+'GAY':[24.74,84.95],
+'GBE':[-24.55,25.92],
+'GCC':[44.35,-105.54],
+'GCI':[49.43,-2.6],
+'GCK':[37.93,-100.72],
+'GCM':[19.29,-81.36],
+'GCN':[35.95,-112.15],
+'GDE':[5.93,43.58],
+'GDL':[20.52,-103.31],
+'GDN':[54.38,18.47],
+'GDQ':[12.52,37.43],
+'GEA':[-22.01,166.22],
+'GEL':[-28.28,-54.17],
+'GEO':[6.5,-58.25],
+'GES':[6.1,125.1],
+'GET':[-28.8,114.71],
+'GFF':[-34.25,146.07],
+'GFK':[47.95,-97.18],
+'GGR':[8.42,49.03],
+'GGT':[23.55,-75.88],
+'GHA':[32.38,3.8],
+'GHB':[25.28,-76.33],
+'GIG':[-22.81,-43.25],
+'GIS':[-38.66,177.98],
+'GIT':[-2.77,32.47],
+'GIZ':[16.9,42.59],
+'GJL':[36.8,5.87],
+'GJT':[39.12,-108.53],
+'GKA':[-6.08,145.39],
+'GLA':[55.87,-4.43],
+'GLN':[29.03,-10.06],
+'GLT':[-23.87,151.52],
+'GMA':[3.67,19.77],
+'GMB':[8.13,34.56],
+'GMP':[37.56,126.79],
+'GMZ':[28.03,-17.21],
+'GOA':[44.41,8.84],
+'GOB':[7.0,40.02],
+'GOI':[15.38,73.83],
+'GOM':[-1.68,29.24],
+'GOT':[57.67,12.28],
+'GOV':[-12.27,136.82],
+'GPS':[-0.45,-90.27],
+'GPT':[30.41,-89.07],
+'GRB':[44.49,-88.13],
+'GRI':[40.97,-98.31],
+'GRJ':[-34.0,22.38],
+'GRK':[31.07,-97.83],
+'GRQ':[53.13,6.58],
+'GRR':[42.88,-85.52],
+'GRU':[-23.43,-46.47],
+'GRX':[37.19,-3.78],
+'GRZ':[46.99,15.44],
+'GSM':[26.75,56.0],
+'GSO':[36.1,-79.94],
+'GSP':[34.9,-82.22],
+'GTF':[47.48,-111.37],
+'GTO':[0.64,122.85],
+'GUA':[14.58,-90.53],
+'GUC':[38.53,-107.04],
+'GUM':[13.48,144.8],
+'GUR':[-10.31,150.33],
+'GVA':[46.24,6.11],
+'GVR':[-18.9,-41.98],
+'GWT':[54.91,8.34],
+'GYD':[40.47,50.05],
+'GYE':[-2.16,-79.88],
+'GYN':[-16.63,-49.22],
+'GZO':[-8.1,156.84],
+'GZP':[36.3,32.3],
+'GZT':[36.95,37.48],
+'HAC':[33.12,139.78],
+'HAD':[56.69,12.82],
+'HAH':[-11.53,43.27],
+'HAK':[19.93,110.46],
+'HAM':[53.63,10.0],
+'HAN':[21.22,105.81],
+'HAS':[27.44,41.69],
+'HAU':[59.35,5.21],
+'HAV':[22.99,-82.41],
+'HBA':[-42.84,147.51],
+'HBE':[30.92,29.7],
+'HDF':[53.88,14.15],
+'HDG':[36.53,114.43],
+'HDN':[40.48,-107.22],
+'HDS':[-24.37,31.05],
+'HDY':[6.93,100.43],
+'HEK':[50.17,127.3],
+'HEL':[60.32,24.96],
+'HER':[35.34,25.18],
+'HFE':[31.34,117.3],
+'HFT':[70.68,23.67],
+'HGA':[9.52,44.09],
+'HGH':[30.23,120.43],
+'HGO':[9.39,-5.52],
+'HGU':[-5.83,144.3],
+'HHH':[32.22,-80.7],
+'HIB':[47.39,-92.84],
+'HID':[-10.59,142.3],
+'HIJ':[34.44,132.92],
+'HIN':[35.08,128.07],
+'HIR':[-9.43,160.05],
+'HJR':[24.3,79.94],
+'HKD':[41.77,140.82],
+'HKG':[22.31,113.91],
+'HKK':[-42.71,170.98],
+'HKN':[-5.47,150.4],
+'HKT':[8.11,98.3],
+'HLD':[49.2,119.82],
+'HMI':[42.84,93.67],
+'HMO':[29.09,-111.05],
+'HNA':[39.43,141.14],
+'HND':[35.55,139.78],
+'HNL':[21.32,-157.92],
+'HNM':[20.8,-156.01],
+'HNY':[26.89,112.63],
+'HOB':[32.69,-103.22],
+'HOF':[25.29,49.49],
+'HOG':[20.79,-76.31],
+'HOM':[59.65,-151.48],
+'HRB':[45.62,126.25],
+'HRE':[-17.93,31.1],
+'HRG':[27.18,33.8],
+'HRI':[6.28,80.63],
+'HRL':[26.23,-97.66],
+'HRO':[36.26,-93.15],
+'HSG':[33.15,130.3],
+'HSN':[29.93,122.36],
+'HSV':[34.64,-86.78],
+'HTI':[-20.35,148.95],
+'HTN':[37.03,79.86],
+'HTS':[38.37,-82.56],
+'HTY':[36.36,36.28],
+'HUE':[14.25,37.69],
+'HUH':[-16.68,-151.03],
+'HUI':[16.4,107.7],
+'HUZ':[23.05,114.35],
+'HVB':[-25.32,152.88],
+'HVD':[48.01,91.63],
+'HWN':[-18.63,26.53],
+'HYD':[17.23,78.43],
+'HYN':[28.56,121.43],
+'IAD':[38.94,-77.46],
+'IAH':[29.99,-95.34],
+'IAS':[47.18,27.62],
+'IBE':[4.42,-75.16],
+'IBZ':[38.87,1.37],
+'ICN':[37.46,126.44],
+'IDA':[43.51,-112.07],
+'IEG':[51.93,15.8],
+'IFN':[32.75,51.86],
+'IGA':[20.97,-73.67],
+'IGD':[39.98,44.01],
+'IGR':[-25.73,-54.47],
+'IGU':[-25.6,-54.49],
+'IKA':[35.41,51.15],
+'ILD':[41.73,0.54],
+'ILM':[34.27,-77.9],
+'ILO':[10.84,122.49],
+'IMP':[-5.53,-47.46],
+'IND':[39.72,-86.29],
+'INH':[-23.86,35.4],
+'INI':[43.34,21.85],
+'INL':[48.57,-93.4],
+'INN':[47.26,11.34],
+'INV':[57.54,-4.05],
+'INZ':[27.98,1.65],
+'IOA':[39.7,20.82],
+'IOM':[54.08,-4.62],
+'IOS':[-14.82,-39.03],
+'IPC':[-27.16,-109.42],
+'IPI':[0.86,-77.67],
+'IPN':[-19.47,-42.49],
+'IQQ':[-20.54,-70.18],
+'IQT':[-3.78,-73.31],
+'IRA':[-10.45,161.9],
+'IRI':[-7.67,35.75],
+'IRP':[2.83,27.59],
+'ISA':[-20.66,139.49],
+'ISC':[49.91,-6.29],
+'ISE':[37.86,30.36],
+'ISG':[24.4,124.19],
+'IST':[40.98,28.82],
+'ISU':[35.56,45.32],
+'ITH':[42.49,-76.46],
+'ITO':[19.72,-155.05],
+'IVC':[-46.41,168.31],
+'IVL':[68.61,27.41],
+'IWK':[34.15,131.71],
+'IXA':[23.89,-91.24],
+'IXB':[26.68,88.33],
+'IXC':[30.67,76.79],
+'IXD':[25.44,81.74],
+'IXE':[12.96,74.89],
+'IXL':[34.16,77.55],
+'IXM':[9.83,78.09],
+'IXR':[23.31,85.32],
+'IXU':[19.86,75.4],
+'IXZ':[11.64,92.73],
+'IZA':[-21.51,-43.17],
+'IZO':[35.41,132.89],
+'JAE':[37.78,-3.87],
+'JAI':[26.82,75.81],
+'JAN':[32.31,-90.08],
+'JAU':[-11.78,-75.47],
+'JAX':[30.49,-81.69],
+'JBR':[35.83,-90.65],
+'JDH':[26.25,73.05],
+'JDO':[-7.22,-39.27],
+'JDZ':[29.34,117.18],
+'JED':[21.68,39.16],
+'JER':[49.21,-2.2],
+'JFK':[40.64,-73.78],
+'JGA':[22.47,70.01],
+'JGN':[39.86,98.34],
+'JHB':[1.64,103.67],
+'JHG':[21.97,100.76],
+'JIB':[11.55,43.16],
+'JIJ':[9.33,42.79],
+'JIM':[7.67,36.83],
+'JIU':[29.73,116.01],
+'JJG':[-28.68,-49.05],
+'JKH':[38.34,26.14],
+'JLN':[37.15,-94.5],
+'JLR':[23.18,80.05],
+'JMK':[37.44,25.35],
+'JMS':[46.93,-98.68],
+'JMU':[46.9,130.46],
+'JNB':[-26.13,28.24],
+'JNG':[35.81,117.18],
+'JNP':[33.79,-117.87],
+'JNU':[58.35,-134.58],
+'JNX':[37.1,25.37],
+'JOE':[62.66,29.61],
+'JOG':[-7.79,110.43],
+'JOI':[-26.22,-48.8],
+'JPA':[-7.14,-34.95],
+'JPR':[-10.87,-61.85],
+'JRO':[-3.43,37.07],
+'JSA':[26.89,70.86],
+'JSI':[39.18,23.5],
+'JSR':[22.8,89.16],
+'JST':[40.32,-78.83],
+'JTC':[-22.16,-49.07],
+'JTR':[36.4,25.48],
+'JUB':[4.87,31.6],
+'JUJ':[-24.39,-65.1],
+'JUL':[-15.47,-70.16],
+'JUM':[29.27,82.19],
+'JUZ':[28.97,118.9],
+'JXA':[45.3,131.19],
+'JXI':[30.77,120.76],
+'JYV':[62.4,25.68],
+'KAA':[-10.22,30.79],
+'KAJ':[64.29,27.69],
+'KAL':[64.32,-158.74],
+'KAN':[12.05,8.52],
+'KAO':[65.99,29.23],
+'KBR':[6.17,102.29],
+'KBV':[8.1,98.99],
+'KCA':[41.72,82.99],
+'KCH':[1.48,110.34],
+'KCM':[37.54,36.95],
+'KDI':[-4.08,122.42],
+'KDV':[-19.06,178.16],
+'KEM':[65.78,24.59],
+'KEO':[9.49,-7.55],
+'KER':[30.27,56.96],
+'KFS':[41.51,33.79],
+'KGA':[-5.9,22.47],
+'KGC':[-35.71,137.52],
+'KGD':[54.89,20.59],
+'KGE':[-7.33,158.58],
+'KGI':[-30.79,121.46],
+'KGL':[-1.97,30.14],
+'KHG':[39.55,76.02],
+'KHH':[22.58,120.35],
+'KHS':[26.17,56.24],
+'KIH':[26.53,53.98],
+'KIJ':[37.96,139.12],
+'KIK':[35.47,44.35],
+'KIM':[-28.8,24.77],
+'KIN':[17.94,-76.79],
+'KIS':[-0.09,34.73],
+'KIU':[-6.12,141.28],
+'KIV':[46.93,28.93],
+'KIX':[34.43,135.24],
+'KKC':[16.47,102.78],
+'KKE':[-35.26,173.91],
+'KKN':[69.73,29.89],
+'KKX':[28.32,129.93],
+'KLO':[11.68,122.38],
+'KLR':[56.69,16.29],
+'KLU':[46.64,14.34],
+'KLX':[37.07,22.03],
+'KME':[-2.46,28.91],
+'KMG':[24.99,102.74],
+'KMJ':[32.84,130.86],
+'KMQ':[36.39,136.41],
+'KMS':[6.72,-1.59],
+'KND':[-2.96,25.92],
+'KNO':[3.64,98.89],
+'KNU':[26.41,80.36],
+'KNX':[-15.78,128.71],
+'KOE':[-10.17,123.66],
+'KOJ':[31.8,130.72],
+'KOK':[63.72,23.14],
+'KOW':[25.83,114.91],
+'KRK':[50.08,19.78],
+'KRL':[41.7,86.13],
+'KRN':[67.82,20.34],
+'KRS':[58.2,8.09],
+'KRY':[45.62,84.99],
+'KSU':[63.11,7.83],
+'KSY':[40.56,43.11],
+'KTA':[-20.71,116.77],
+'KTM':[27.7,85.36],
+'KTN':[55.36,-131.71],
+'KTT':[67.7,24.85],
+'KTW':[50.47,19.08],
+'KUA':[3.78,103.21],
+'KUF':[53.5,50.14],
+'KUL':[2.75,101.71],
+'KUM':[30.84,130.66],
+'KUN':[54.96,24.08],
+'KUO':[63.01,27.79],
+'KVA':[40.91,24.62],
+'KVG':[-2.58,150.81],
+'KVO':[43.82,20.59],
+'KWA':[8.72,167.74],
+'KWI':[29.23,47.97],
+'KWJ':[35.12,126.81],
+'KWL':[25.22,110.04],
+'KWZ':[-10.77,25.5],
+'KYA':[37.98,32.56],
+'KYE':[34.59,36.0],
+'KZR':[39.14,30.13],
+'LAD':[-8.86,13.23],
+'LAE':[-6.57,146.73],
+'LAO':[18.18,120.53],
+'LAR':[41.31,-105.67],
+'LAS':[36.08,-115.15],
+'LAW':[34.57,-98.41],
+'LAX':[33.94,-118.41],
+'LBA':[53.87,-1.66],
+'LBB':[33.66,-101.82],
+'LBC':[53.81,10.71],
+'LBF':[41.13,-100.96],
+'LBL':[37.04,-100.96],
+'LBS':[-16.47,179.34],
+'LBU':[5.3,115.24],
+'LBV':[0.46,9.41],
+'LCE':[15.74,-86.85],
+'LCG':[43.3,-8.38],
+'LCH':[30.13,-93.22],
+'LCX':[25.67,116.75],
+'LCY':[51.5,0.05],
+'LDB':[-23.33,-51.13],
+'LDY':[55.04,-7.16],
+'LED':[59.8,30.26],
+'LEI':[36.85,-2.37],
+'LEJ':[51.42,12.24],
+'LET':[-4.19,-69.94],
+'LEU':[42.34,1.41],
+'LEX':[38.04,-84.61],
+'LFT':[30.21,-91.99],
+'LFW':[6.17,1.25],
+'LGB':[33.82,-118.15],
+'LGG':[50.64,5.44],
+'LGI':[23.17,-75.09],
+'LGK':[6.33,99.73],
+'LGP':[13.16,123.73],
+'LGW':[51.16,-0.18],
+'LHR':[51.48,-0.45],
+'LIG':[45.86,1.18],
+'LIL':[50.56,3.09],
+'LIM':[-12.02,-77.11],
+'LIN':[45.45,9.28],
+'LIR':[10.59,-85.54],
+'LIS':[38.77,-9.13],
+'LIT':[34.73,-92.22],
+'LJG':[26.68,100.25],
+'LJU':[46.22,14.46],
+'LKN':[68.15,13.61],
+'LKO':[26.76,80.89],
+'LLA':[65.54,22.12],
+'LLI':[12.04,39.07],
+'LME':[47.95,0.2],
+'LMM':[25.69,-109.08],
+'LMP':[35.5,12.62],
+'LNJ':[23.74,100.25],
+'LNK':[40.85,-96.76],
+'LNS':[40.12,-76.3],
+'LNZ':[48.23,14.19],
+'LOG':[46.38,-117.01],
+'LOO':[33.76,2.92],
+'LOP':[-8.76,116.28],
+'LOS':[6.58,3.32],
+'LPA':[27.93,-15.39],
+'LPB':[-16.51,-68.19],
+'LPI':[58.41,15.52],
+'LPL':[53.34,-2.85],
+'LPQ':[19.9,102.16],
+'LRD':[27.54,-99.46],
+'LRE':[-23.43,144.27],
+'LRM':[18.45,-68.91],
+'LRR':[27.67,54.38],
+'LSC':[-29.91,-71.2],
+'LST':[-41.55,147.21],
+'LSZ':[28.05,119.93],
+'LTI':[46.24,96.23],
+'LTO':[25.99,-111.35],
+'LUG':[46.0,8.91],
+'LUN':[-15.33,28.45],
+'LUQ':[-33.27,-66.36],
+'LUX':[49.63,6.21],
+'LUZ':[51.24,22.71],
+'LVI':[-17.82,25.82],
+'LXA':[29.3,91.12],
+'LXR':[25.67,32.71],
+'LXS':[39.92,25.24],
+'LYG':[34.57,119.18],
+'LYH':[37.32,-79.2],
+'LYS':[45.72,5.08],
+'LZH':[24.21,109.39],
+'MAA':[12.99,80.18],
+'MAB':[-5.37,-49.13],
+'MAD':[40.49,-3.57],
+'MAF':[31.94,-102.2],
+'MAG':[-5.21,145.79],
+'MAH':[39.86,4.22],
+'MAJ':[7.07,171.27],
+'MAM':[25.77,-97.53],
+'MAN':[53.35,-2.27],
+'MAO':[-3.04,-60.05],
+'MAR':[10.56,-71.73],
+'MAS':[-2.04,147.42],
+'MAZ':[18.25,-67.15],
+'MBA':[-4.03,39.59],
+'MBI':[-8.92,33.47],
+'MBJ':[18.5,-77.91],
+'MCO':[28.43,-81.31],
+'MCP':[0.05,-51.07],
+'MCT':[23.59,58.28],
+'MCW':[43.16,-93.33],
+'MCX':[42.82,47.65],
+'MCY':[-26.6,153.09],
+'MCZ':[-9.51,-35.79],
+'MDC':[1.55,124.93],
+'MDE':[6.16,-75.43],
+'MDG':[44.58,129.59],
+'MDK':[0.02,18.29],
+'MDL':[21.7,96.0],
+'MDQ':[-37.93,-57.58],
+'MDZ':[-32.83,-68.79],
+'MEC':[-0.94,-80.68],
+'MED':[24.55,39.71],
+'MEL':[-37.67,144.84],
+'MEM':[35.04,-89.98],
+'MEX':[19.44,-99.07],
+'MFE':[26.18,-98.24],
+'MFM':[22.15,113.59],
+'MFR':[42.37,-122.87],
+'MFU':[-13.26,31.94],
+'MGA':[12.14,-86.17],
+'MGB':[-37.75,140.79],
+'MGF':[-23.48,-52.01],
+'MGH':[-30.86,30.35],
+'MGM':[32.3,-86.39],
+'MGQ':[2.01,45.3],
+'MHC':[-42.45,-72.62],
+'MHD':[36.24,59.64],
+'MHG':[49.47,8.51],
+'MHH':[26.51,-77.08],
+'MHQ':[60.12,19.9],
+'MIA':[25.79,-80.29],
+'MID':[20.94,-89.66],
+'MII':[-22.18,-49.92],
+'MIM':[-36.91,149.9],
+'MIR':[35.76,10.75],
+'MJM':[-6.12,23.57],
+'MJT':[39.06,26.6],
+'MKE':[42.95,-87.9],
+'MKK':[21.15,-157.1],
+'MKQ':[-8.52,140.42],
+'MKY':[-21.17,149.18],
+'MLA':[35.86,14.48],
+'MLG':[-7.93,112.71],
+'MLI':[41.45,-90.51],
+'MLM':[19.85,-101.03],
+'MLN':[35.28,-2.96],
+'MLS':[-26.8,150.98],
+'MLX':[38.44,38.09],
+'MMB':[43.88,144.16],
+'MMJ':[36.17,137.92],
+'MMX':[55.54,13.37],
+'MMY':[24.78,125.3],
+'MNC':[-14.5,40.71],
+'MNI':[16.79,-62.19],
+'MNL':[14.51,121.02],
+'MNS':[-11.1,28.66],
+'MOB':[30.69,-88.24],
+'MOC':[-16.71,-43.82],
+'MOL':[62.74,7.26],
+'MOT':[48.26,-101.28],
+'MOV':[-22.06,148.07],
+'MOZ':[-17.49,-149.76],
+'MPD':[-6.37,31.08],
+'MPH':[11.92,122.08],
+'MPL':[43.58,3.96],
+'MPM':[-25.92,32.57],
+'MQL':[-34.23,142.09],
+'MQM':[37.22,40.63],
+'MQP':[-25.38,31.1],
+'MQX':[13.47,39.53],
+'MRS':[43.44,5.22],
+'MRU':[-20.43,57.68],
+'MRV':[44.23,43.08],
+'MRZ':[-29.5,149.83],
+'MSJ':[40.7,141.38],
+'MSN':[43.14,-89.34],
+'MSO':[46.92,-114.09],
+'MSP':[44.88,-93.22],
+'MSR':[38.75,41.66],
+'MST':[50.91,5.77],
+'MSU':[-29.46,27.55],
+'MSY':[29.99,-90.26],
+'MTJ':[38.51,-107.89],
+'MTR':[8.82,-75.83],
+'MTT':[18.1,-94.84],
+'MTY':[25.77,-100.11],
+'MUA':[-8.33,157.26],
+'MUB':[-19.97,23.43],
+'MUC':[48.35,11.79],
+'MUD':[49.2,123.02],
+'MVC':[32.34,-87.35],
+'MVD':[-34.84,-56.01],
+'MVY':[41.39,-70.61],
+'MWZ':[-2.44,32.93],
+'MXL':[32.63,-115.24],
+'MXP':[45.63,8.72],
+'MXV':[49.66,91.39],
+'MXZ':[24.35,116.13],
+'MYG':[22.38,-73.01],
+'MYJ':[33.83,132.7],
+'MYR':[33.68,-78.93],
+'MYW':[-10.34,40.18],
+'MYY':[4.32,113.99],
+'MZH':[40.83,35.65],
+'MZL':[5.03,-75.47],
+'MZT':[23.16,-106.27],
+'NAG':[21.09,79.05],
+'NAN':[-17.75,177.45],
+'NAP':[40.89,14.29],
+'NAS':[25.04,-77.47],
+'NAT':[-5.91,-35.25],
+'NAV':[38.52,34.53],
+'NBE':[36.08,10.44],
+'NBO':[-1.32,36.93],
+'NBS':[42.39,127.6],
+'NCE':[43.66,7.21],
+'NCL':[55.04,-1.69],
+'NDJ':[12.13,15.03],
+'NDR':[34.99,-2.93],
+'NEK':[9.08,36.51],
+'NEV':[17.21,-62.59],
+'NGB':[29.83,121.46],
+'NGO':[34.86,136.81],
+'NHA':[12.23,109.19],
+'NIM':[13.48,2.18],
+'NJF':[31.99,44.4],
+'NJH':[17.61,44.12],
+'NJK':[33.05,-115.67],
+'NKC':[18.1,-15.95],
+'NKG':[31.74,118.86],
+'NKT':[37.37,42.12],
+'NLA':[-12.99,28.66],
+'NLD':[27.44,-99.57],
+'NNY':[35.61,112.61],
+'NOC':[53.91,-9.53],
+'NOS':[-13.31,48.31],
+'NOU':[-22.01,166.22],
+'NPE':[-39.47,176.87],
+'NPL':[-39.01,174.18],
+'NQN':[-38.95,-68.16],
+'NRT':[35.77,140.39],
+'NSI':[3.72,11.55],
+'NSN':[-41.3,173.22],
+'NTE':[47.15,-1.61],
+'NTG':[32.07,120.98],
+'NTL':[-32.79,151.84],
+'NTQ':[37.29,136.96],
+'NTR':[16.56,-93.02],
+'NUE':[49.5,11.07],
+'NUM':[27.99,35.0],
+'NVA':[2.95,-75.29],
+'NVK':[68.44,17.39],
+'NVT':[-26.88,-48.65],
+'NWI':[52.68,1.28],
+'NZH':[49.57,117.33],
+'OAG':[-33.62,149.13],
+'OAK':[37.72,-122.22],
+'OAX':[17.0,-96.73],
+'OBO':[42.73,143.22],
+'OCC':[0.5,-76.99],
+'OCJ':[18.4,-77.1],
+'OGX':[31.92,5.41],
+'OHD':[41.18,20.74],
+'OIR':[44.02,144.19],
+'OIT':[33.48,131.74],
+'OKA':[26.2,127.65],
+'OKC':[35.39,-97.6],
+'OKE':[27.08,128.7],
+'OKI':[36.18,133.32],
+'OLB':[40.9,9.52],
+'OMA':[41.3,-95.89],
+'OMO':[43.28,17.85],
+'OMR':[47.03,21.9],
+'ONJ':[40.41,-77.02],
+'ONQ':[41.51,31.75],
+'ONS':[-21.67,115.11],
+'OOL':[-28.17,153.51],
+'OPO':[41.24,-8.68],
+'OPS':[-11.88,-55.59],
+'ORD':[41.98,-87.91],
+'ORF':[36.9,-76.03],
+'ORH':[42.27,-71.88],
+'ORK':[51.84,-8.49],
+'ORN':[35.62,-0.62],
+'ORU':[-17.96,-67.08],
+'ORY':[48.72,2.38],
+'OSD':[63.19,14.5],
+'OSI':[45.46,18.81],
+'OSL':[60.2,11.08],
+'OSR':[49.7,18.11],
+'OTP':[44.57,26.1],
+'OUA':[12.35,-1.51],
+'OUD':[34.79,-1.92],
+'OUL':[64.93,25.35],
+'OVB':[55.01,82.65],
+'OVD':[43.56,-6.03],
+'OXB':[11.89,-15.65],
+'OZC':[8.18,123.84],
+'OZG':[30.37,-5.63],
+'OZZ':[30.94,-6.91],
+'PAD':[51.61,8.62],
+'PAE':[47.91,-122.28],
+'PAH':[37.06,-88.77],
+'PAP':[18.58,-72.29],
+'PAS':[37.02,25.12],
+'PAT':[25.59,85.09],
+'PBC':[19.16,-98.37],
+'PBI':[26.68,-80.1],
+'PBM':[5.45,-55.19],
+'PBO':[-23.17,117.75],
+'PCL':[-8.38,-74.57],
+'PCM':[9.85,126.03],
+'PDP':[-34.91,-54.92],
+'PEG':[43.09,12.51],
+'PEI':[4.81,-75.74],
+'PEK':[40.08,116.6],
+'PEM':[-12.61,-69.23],
+'PEN':[5.3,100.28],
+'PER':[-31.94,115.97],
+'PET':[-31.72,-52.33],
+'PFB':[-28.24,-52.33],
+'PGK':[-2.16,106.14],
+'PHC':[4.95,6.97],
+'PHE':[-20.38,118.63],
+'PHL':[39.87,-75.24],
+'PHX':[33.44,-112.01],
+'PIA':[40.66,-89.69],
+'PIB':[31.47,-89.34],
+'PIH':[42.91,-112.6],
+'PIR':[44.38,-100.29],
+'PIT':[40.49,-80.23],
+'PIU':[-5.21,-80.62],
+'PKU':[0.46,101.44],
+'PKY':[-2.22,113.94],
+'PLM':[-2.9,104.7],
+'PLN':[45.57,-84.8],
+'PLO':[-34.61,135.88],
+'PLQ':[55.97,21.1],
+'PLW':[-0.92,119.91],
+'PLZ':[-33.98,25.62],
+'PMC':[-41.43,-73.09],
+'PMI':[39.55,2.74],
+'PMO':[38.18,13.09],
+'PMR':[-40.32,175.62],
+'PMW':[-10.29,-48.36],
+'PMY':[-42.76,-65.1],
+'PNA':[42.77,-1.65],
+'PNH':[11.55,104.84],
+'PNK':[0.15,109.4],
+'PNL':[36.81,11.97],
+'PNP':[-8.8,148.31],
+'PNQ':[18.58,73.92],
+'PNS':[30.47,-87.19],
+'PNT':[-51.67,-72.52],
+'PNZ':[-9.36,-40.57],
+'POA':[-29.99,-51.17],
+'POJ':[-18.67,-46.49],
+'POL':[-12.99,40.52],
+'POM':[-9.44,147.22],
+'POP':[19.76,-70.57],
+'POS':[10.6,-61.34],
+'POZ':[52.42,16.83],
+'PPB':[-22.18,-51.42],
+'PPN':[2.45,-76.61],
+'PPP':[-20.5,148.55],
+'PPS':[9.74,118.76],
+'PPT':[-17.55,-149.61],
+'PQC':[10.17,104.0],
+'PQQ':[-31.44,152.87],
+'PRA':[-31.73,-60.48],
+'PRC':[34.65,-112.42],
+'PRG':[50.1,14.26],
+'PRI':[-3.32,55.69],
+'PRN':[42.57,21.04],
+'PSA':[43.68,10.39],
+'PSC':[46.26,-119.12],
+'PSE':[18.01,-66.56],
+'PSO':[1.4,-77.01],
+'PSR':[42.43,14.19],
+'PSS':[-27.39,-55.97],
+'PTG':[-23.86,29.46],
+'PTP':[16.27,-61.53],
+'PTY':[9.07,-79.38],
+'PUF':[43.38,-0.42],
+'PUJ':[18.57,-68.36],
+'PUQ':[-52.85,-70.85],
+'PUS':[35.18,128.94],
+'PUY':[44.89,13.92],
+'PVD':[41.73,-71.43],
+'PVG':[31.14,121.81],
+'PVH':[-8.71,-63.9],
+'PVK':[38.93,20.77],
+'PVR':[20.68,-105.25],
+'PVU':[40.22,-111.72],
+'PXO':[33.07,-16.35],
+'PYX':[12.74,101.19],
+'PZB':[-29.65,30.4],
+'PZU':[19.58,37.22],
+'QGL':[47.41,9.34],
+'QRO':[20.62,-100.19],
+'QSF':[36.18,5.32],
+'QSR':[40.62,14.91],
+'QSZ':[38.28,76.91],
+'RAB':[-4.34,152.38],
+'RAE':[30.91,41.14],
+'RAH':[29.63,43.49],
+'RAJ':[22.31,70.78],
+'RAK':[31.6,-8.04],
+'RAO':[-21.13,-47.77],
+'RAP':[44.05,-103.06],
+'RBA':[34.05,-6.77],
+'RBQ':[-14.43,-67.55],
+'RBR':[-9.87,-67.9],
+'RCB':[-28.74,32.09],
+'RCH':[11.53,-72.93],
+'RDD':[40.51,-122.29],
+'RDM':[44.25,-121.15],
+'RDU':[35.88,-78.79],
+'REC':[-8.13,-34.92],
+'REG':[38.07,15.65],
+'REL':[-43.21,-65.27],
+'REP':[13.41,103.82],
+'RES':[-27.45,-59.06],
+'REX':[26.01,-98.23],
+'RFD':[42.2,-89.09],
+'RFP':[-16.72,-151.46],
+'RGA':[-53.78,-67.75],
+'RGI':[-15.72,-147.66],
+'RGL':[-51.61,-69.31],
+'RGN':[16.9,96.13],
+'RHD':[-27.8,-64.93],
+'RHI':[45.63,-89.47],
+'RHO':[36.41,28.09],
+'RIC':[37.51,-77.32],
+'RIJ':[-6.07,-77.16],
+'RIW':[43.06,-108.46],
+'RIX':[56.92,23.97],
+'RIZ':[35.4,119.33],
+'RJH':[24.44,88.62],
+'RJK':[45.22,14.57],
+'RJL':[42.46,-2.32],
+'RKZ':[29.35,88.08],
+'RLK':[40.93,107.75],
+'RLO':[-32.44,-65.19],
+'RMF':[25.56,34.58],
+'RMI':[44.02,12.61],
+'RMQ':[24.26,120.62],
+'RNJ':[27.04,128.4],
+'RNL':[-11.68,160.47],
+'RNN':[55.06,14.76],
+'RNS':[48.07,-1.73],
+'ROA':[37.33,-79.97],
+'ROB':[6.23,-10.36],
+'ROC':[43.12,-77.67],
+'ROK':[-23.38,150.48],
+'ROO':[-16.58,-54.72],
+'ROS':[-32.9,-60.79],
+'ROT':[-38.11,176.32],
+'ROW':[33.3,-104.53],
+'RPR':[21.18,81.73],
+'RRG':[-19.74,63.37],
+'RSA':[-36.59,-64.28],
+'RSD':[24.89,-76.18],
+'RSU':[34.84,127.62],
+'RSW':[26.54,-81.76],
+'RTA':[-12.49,-177.07],
+'RTB':[16.31,-86.52],
+'RTM':[51.96,4.44],
+'RUH':[24.96,46.7],
+'RVN':[66.56,25.83],
+'RVY':[-30.97,-55.48],
+'RXS':[11.6,122.75],
+'RYL':[-15.62,29.0],
+'RZE':[50.11,22.02],
+'RZV':[41.08,40.88],
+'SAB':[17.64,-63.22],
+'SAG':[33.15,130.3],
+'SAL':[13.44,-89.06],
+'SAT':[29.53,-98.47],
+'SAV':[32.13,-81.2],
+'SAW':[40.9,29.31],
+'SBH':[17.9,-62.84],
+'SBN':[41.71,-86.32],
+'SBP':[35.24,-120.64],
+'SBW':[2.26,111.98],
+'SBZ':[45.79,24.09],
+'SCC':[70.2,-148.46],
+'SCL':[-33.39,-70.79],
+'SCN':[49.21,7.11],
+'SCQ':[42.9,-8.41],
+'SCR':[61.16,13.73],
+'SCU':[20.0,-75.84],
+'SCV':[47.69,26.35],
+'SCZ':[-11.61,166.84],
+'SDE':[-27.56,-64.31],
+'SDF':[38.17,-85.73],
+'SDJ':[38.14,140.92],
+'SDK':[5.9,118.06],
+'SDL':[62.53,17.44],
+'SDQ':[18.43,-69.67],
+'SDR':[43.43,-3.82],
+'SDU':[-22.91,-43.17],
+'SEA':[47.45,-122.31],
+'SEZ':[-4.67,55.52],
+'SFA':[34.72,10.69],
+'SFN':[-31.71,-60.81],
+'SFO':[37.62,-122.38],
+'SFQ':[37.09,38.84],
+'SGF':[37.25,-93.39],
+'SGN':[10.82,106.67],
+'SGX':[-10.68,35.59],
+'SHC':[14.08,38.28],
+'SHE':[41.64,123.49],
+'SHJ':[25.33,55.52],
+'SHM':[33.66,135.36],
+'SHR':[44.77,-106.98],
+'SHV':[32.45,-93.83],
+'SHW':[17.47,47.12],
+'SIC':[42.02,35.07],
+'SIN':[1.36,103.99],
+'SIS':[-27.64,22.99],
+'SIT':[57.05,-135.36],
+'SJD':[23.15,-109.72],
+'SJI':[10.77,121.93],
+'SJJ':[43.82,18.33],
+'SJO':[9.99,-84.21],
+'SJP':[-20.82,-49.41],
+'SJT':[31.36,-100.5],
+'SJU':[18.44,-65.99],
+'SKB':[17.31,-62.72],
+'SKG':[40.52,22.97],
+'SKP':[41.96,21.62],
+'SLA':[-24.85,-65.49],
+'SLC':[40.79,-111.98],
+'SLI':[-12.18,26.37],
+'SLK':[44.38,-74.21],
+'SLL':[17.04,54.09],
+'SLN':[38.79,-97.65],
+'SLP':[22.25,-100.93],
+'SLZ':[-2.59,-44.24],
+'SMI':[37.69,26.91],
+'SML':[23.37,-75.27],
+'SMR':[11.12,-74.24],
+'SMW':[26.75,-11.69],
+'SNN':[52.7,-8.91],
+'SNU':[22.49,-79.94],
+'SOF':[42.69,23.41],
+'SON':[-15.51,167.22],
+'SOQ':[-0.93,131.12],
+'SOU':[50.95,-1.36],
+'SPC':[28.63,-17.76],
+'SPD':[25.76,88.91],
+'SPE':[44.1,9.87],
+'SPN':[15.12,145.73],
+'SPS':[33.99,-98.49],
+'SPU':[43.54,16.3],
+'SPY':[4.75,-6.67],
+'SQD':[28.38,117.96],
+'SQJ':[26.43,117.83],
+'SRE':[-19.01,-65.29],
+'SRI':[0.56,117.57],
+'SRQ':[27.4,-82.55],
+'SSA':[-12.91,-38.33],
+'SSH':[27.97,34.4],
+'SSI':[31.15,-81.39],
+'SSJ':[65.96,12.47],
+'STI':[19.41,-70.6],
+'STL':[38.75,-90.37],
+'STM':[-2.42,-54.79],
+'STN':[51.89,0.24],
+'STR':[48.69,9.22],
+'STT':[18.34,-64.97],
+'STV':[21.11,72.74],
+'STY':[-31.44,-57.98],
+'SUB':[-7.38,112.79],
+'SUF':[38.9,16.24],
+'SUJ':[47.7,22.89],
+'SUN':[43.5,-114.3],
+'SUV':[-18.05,178.56],
+'SUX':[42.4,-96.38],
+'SVD':[13.14,-61.21],
+'SVG':[58.88,5.64],
+'SVJ':[68.24,14.67],
+'SVO':[55.97,37.41],
+'SVQ':[37.42,-5.89],
+'SVU':[-16.8,179.34],
+'SVX':[56.84,60.8],
+'SWA':[23.4,116.76],
+'SWO':[36.18,-97.09],
+'SXB':[48.54,7.63],
+'SXM':[18.04,-63.11],
+'SXR':[34.0,74.77],
+'SXZ':[37.98,41.84],
+'SYD':[-33.95,151.18],
+'SYO':[38.81,139.79],
+'SYR':[43.11,-76.11],
+'SYX':[18.31,109.41],
+'SYZ':[29.54,52.59],
+'SZE':[11.69,40.99],
+'SZF':[41.25,36.57],
+'SZG':[47.79,13.0],
+'SZK':[-24.96,31.59],
+'SZX':[22.64,113.81],
+'SZY':[53.48,20.94],
+'TAB':[11.15,-60.83],
+'SNA':[33.68,-117.87],
+'STX':[17.70,-64.80],
+'TAC':[11.23,125.02],
+'TAE':[35.89,128.66],
+'TAH':[-19.46,169.43],
+'TAK':[34.21,134.02],
+'TAM':[22.3,-97.87],
+'TAO':[36.27,120.38],
+'TAP':[14.79,-92.37],
+'TAY':[58.31,26.69],
+'TBG':[-5.27,141.22],
+'TBO':[-5.07,32.83],
+'TBP':[-3.55,-80.38],
+'TBS':[41.67,44.95],
+'TBU':[-21.24,-175.15],
+'TBZ':[38.13,46.24],
+'TCG':[46.67,83.34],
+'TCQ':[-18.05,-70.28],
+'TDD':[-14.82,-64.92],
+'TEE':[35.43,8.12],
+'TET':[-16.1,33.64],
+'TEX':[37.95,-107.91],
+'TFN':[28.4,-16.34],
+'TFS':[28.04,-16.57],
+'TGD':[42.36,19.25],
+'TGG':[5.38,103.1],
+'TGR':[33.07,6.09],
+'TGU':[14.06,-87.22],
+'THE':[-5.06,-42.82],
+'THS':[17.24,99.82],
+'TIA':[41.42,19.72],
+'TID':[35.34,1.46],
+'TIF':[21.49,40.54],
+'TIH':[-15.12,-148.23],
+'TIJ':[32.54,-116.97],
+'TIM':[-4.53,136.89],
+'TIN':[27.7,8.17],
+'TIR':[13.63,79.54],
+'TIU':[-44.3,171.23],
+'TIV':[42.4,18.72],
+'TIZ':[-5.84,143.31],
+'TJA':[-21.55,-64.7],
+'TJH':[35.51,134.79],
+'TJK':[40.31,36.37],
+'TKD':[4.9,-1.77],
+'TKG':[-5.24,105.18],
+'TKN':[27.83,128.88],
+'TKQ':[-5.08,36.62],
+'TKU':[60.51,22.27],
+'TLH':[30.4,-84.35],
+'TLL':[59.41,24.83],
+'TLM':[35.02,-1.45],
+'TLN':[43.1,6.15],
+'TLS':[43.63,1.37],
+'TLV':[32.01,34.89],
+'TML':[9.56,-0.86],
+'TMP':[61.41,23.6],
+'TMR':[22.81,5.46],
+'TMS':[0.38,6.72],
+'TMW':[-31.08,150.85],
+'TNA':[36.86,117.22],
+'TNG':[35.73,-5.92],
+'TNH':[41.09,125.33],
+'TNJ':[0.93,104.53],
+'TNR':[-18.8,47.48],
+'TOS':[69.68,18.92],
+'TPA':[27.98,-82.54],
+'TPE':[25.08,121.23],
+'TPP':[-6.51,-76.37],
+'TPQ':[21.42,-104.84],
+'TRC':[25.57,-103.41],
+'TRD':[63.46,10.92],
+'TRG':[-37.67,176.2],
+'TRN':[45.2,7.65],
+'TRS':[45.83,13.47],
+'TRU':[-8.08,-79.11],
+'TRV':[8.47,76.92],
+'TRW':[1.38,173.13],
+'TRZ':[10.77,78.7],
+'TSA':[25.07,121.55],
+'TSJ':[34.28,129.32],
+'TSN':[39.12,117.35],
+'TSR':[45.8,21.34],
+'TSV':[-19.25,146.77],
+'TTA':[28.45,-11.09],
+'TTE':[0.83,127.38],
+'TTU':[35.59,-5.32],
+'TUC':[-26.84,-65.1],
+'TUG':[17.64,121.73],
+'TUI':[29.64,38.73],
+'TUL':[36.2,-95.89],
+'TUN':[36.85,10.23],
+'TUO':[-38.74,176.08],
+'TUS':[32.12,-110.94],
+'TUU':[28.37,36.62],
+'TUY':[20.22,-87.45],
+'TVC':[44.74,-85.58],
+'TVS':[39.72,118.0],
+'TVU':[-16.69,-179.88],
+'TWB':[-27.54,151.91],
+'TWF':[42.48,-114.49],
+'TWT':[5.05,119.75],
+'TWU':[4.26,118.12],
+'TXK':[33.45,-93.99],
+'TXN':[29.73,118.26],
+'TYL':[-6.56,-79.88],
+'TYN':[37.75,112.63],
+'TYR':[32.35,-95.4],
+'TYS':[35.81,-83.99],
+'TZX':[40.99,39.79],
+'UBA':[-19.76,-47.95],
+'UBJ':[33.93,131.28],
+'UBP':[15.25,104.87],
+'UCB':[41.13,113.11],
+'UDI':[-18.88,-48.23],
+'UDR':[24.62,73.9],
+'UEL':[-17.86,36.87],
+'UEO':[26.36,126.71],
+'UFA':[54.56,55.87],
+'UIB':[5.69,-76.64],
+'UIH':[13.95,109.04],
+'UIO':[-0.13,-78.49],
+'ULG':[48.99,89.92],
+'ULN':[47.84,106.77],
+'UME':[63.79,20.28],
+'UPG':[-5.06,119.55],
+'UPN':[-28.64,30.96],
+'URC':[43.91,87.47],
+'URE':[58.23,22.51],
+'URY':[31.07,37.28],
+'USH':[-54.84,-68.3],
+'USM':[9.55,100.06],
+'USN':[35.59,129.35],
+'UTH':[17.39,102.79],
+'UTT':[-31.55,28.67],
+'UYN':[38.36,109.73],
+'UYU':[-20.46,-66.85],
+'VAA':[63.05,21.76],
+'VAF':[44.92,4.97],
+'VAI':[-2.69,141.3],
+'VAN':[38.47,43.33],
+'VAO':[-10.72,162.29],
+'VAR':[43.23,27.83],
+'VAV':[-18.59,-173.96],
+'VBS':[45.43,10.33],
+'VBY':[57.66,18.35],
+'VCA':[10.09,105.71],
+'VCE':[45.5,12.35],
+'VCP':[-22.99,-47.13],
+'VDC':[-14.86,-40.86],
+'VDE':[27.81,-17.89],
+'VDH':[17.47,106.59],
+'VDM':[-40.87,-63.01],
+'VER':[19.14,-96.19],
+'VFA':[-17.92,25.84],
+'VGA':[16.53,80.8],
+'VGO':[42.23,-8.63],
+'VIE':[48.11,16.57],
+'VIL':[23.72,-14.67],
+'VIX':[-20.26,-40.29],
+'VLC':[39.49,-0.48],
+'VLD':[30.78,-83.28],
+'VLI':[-17.7,168.32],
+'VLL':[41.71,-4.85],
+'VNO':[54.63,25.29],
+'VNS':[25.45,82.86],
+'VNX':[-22.02,35.31],
+'VOG':[48.78,44.35],
+'VOL':[39.38,22.8],
+'VPY':[-19.11,33.43],
+'VQS':[18.13,-65.42],
+'VRA':[23.03,-81.44],
+'VRB':[27.66,-80.42],
+'VRN':[45.4,10.89],
+'VSA':[17.99,-92.81],
+'VTE':[17.99,102.56],
+'VTZ':[17.72,83.22],
+'VUP':[10.43,-73.24],
+'VVC':[4.17,-73.61],
+'VVI':[-17.64,-63.13],
+'VVO':[43.4,132.15],
+'VXC':[-13.27,35.27],
+'WAE':[20.5,45.07],
+'WAW':[52.17,20.97],
+'WBM':[-5.64,143.66],
+'WEH':[37.19,122.23],
+'WEI':[-12.68,141.93],
+'WGA':[-35.16,147.47],
+'WIL':[-1.31,36.82],
+'WKJ':[45.4,141.8],
+'WLG':[-41.33,174.81],
+'WMI':[52.45,20.65],
+'WRE':[-35.77,174.36],
+'WRG':[56.48,-132.37],
+'WRO':[51.1,16.89],
+'WUH':[30.78,114.21],
+'WUS':[27.71,118.0],
+'WWK':[-3.58,143.67],
+'WYA':[-33.1,137.52],
+'XAP':[-27.13,-52.66],
+'XCH':[-10.45,105.69],
+'XIY':[34.45,108.75],
+'XNT':[37.04,114.56],
+'XPL':[14.38,-87.62],
+'XRY':[36.74,-6.06],
+'XUZ':[34.06,117.55],
+'XVQ':[14.02,-60.99],
+'YAB':[73.0,-85.05],
+'YAK':[59.51,-139.66],
+'YBB':[67.86,-96.08],
+'YBG':[48.33,-71.0],
+'YBL':[49.95,-125.27],
+'YBR':[49.91,-99.95],
+'YCB':[69.11,-105.14],
+'YCG':[49.3,-117.63],
+'YCO':[67.83,-115.14],
+'YCY':[70.49,-68.52],
+'YEG':[53.31,-113.58],
+'YEV':[68.3,-133.49],
+'YFB':[63.76,-68.56],
+'YFC':[45.87,-66.54],
+'YFS':[61.76,-121.24],
+'YGJ':[35.49,133.24],
+'YGT':[72.68,-77.97],
+'YGV':[50.29,-63.6],
+'YGW':[55.28,-77.76],
+'YHI':[70.76,-117.81],
+'YHK':[68.64,-95.85],
+'YHM':[43.17,-79.93],
+'YHY':[60.84,-115.78],
+'YHZ':[44.88,-63.51],
+'YIH':[30.56,111.47],
+'YIN':[43.91,81.33],
+'YIO':[72.69,-77.98],
+'YIW':[29.35,120.03],
+'YKA':[50.7,-120.44],
+'YKH':[40.56,122.36],
+'YKM':[46.57,-120.54],
+'YKO':[37.49,43.8],
+'YKQ':[52.26,-81.6],
+'YKU':[53.69,-78.94],
+'YLC':[62.85,-69.88],
+'YLW':[49.96,-119.38],
+'YMM':[56.65,-111.22],
+'YMT':[49.77,-74.53],
+'YNC':[53.06,-78.84],
+'YNF':[49.01,-57.39],
+'YNO':[52.49,-84.02],
+'YNS':[51.69,-76.36],
+'YNT':[37.4,121.37],
+'YNZ':[33.43,120.13],
+'YOJ':[57.4,-117.17],
+'YOW':[45.32,-75.67],
+'YPM':[51.82,-90.21],
+'YPR':[54.29,-130.44],
+'YQB':[46.79,-71.39],
+'YQG':[42.28,-82.96],
+'YQK':[49.79,-94.36],
+'YQM':[46.11,-64.68],
+'YQQ':[49.72,-124.88],
+'YQR':[50.43,-104.67],
+'YQT':[48.37,-89.32],
+'YQU':[55.18,-118.89],
+'YQX':[48.94,-54.57],
+'YRB':[74.72,-94.97],
+'YRL':[51.07,-93.79],
+'YRT':[62.81,-92.11],
+'YSB':[46.62,-80.8],
+'YSJ':[45.32,-65.89],
+'YTE':[62.33,-64.61],
+'YTM':[46.41,-75.0],
+'YTS':[48.56,-81.38],
+'YUL':[45.47,-73.74],
+'YUM':[32.66,-114.61],
+'YUY':[48.21,-78.83],
+'YVM':[61.05,-69.0],
+'YVO':[48.05,-77.78],
+'YVP':[58.1,-68.43],
+'YVQ':[65.28,-126.8],
+'YVR':[49.19,-123.18],
+'YWG':[49.91,-97.24],
+'YXC':[49.61,-115.78],
+'YXE':[52.17,-106.7],
+'YXH':[50.02,-110.72],
+'YXJ':[56.24,-120.74],
+'YXL':[50.11,-91.91],
+'YXP':[72.69,-77.97],
+'YXS':[53.89,-122.68],
+'YXX':[49.02,-122.36],
+'YXY':[60.71,-135.07],
+'YYB':[46.36,-79.42],
+'YYC':[51.13,-114.01],
+'YYD':[54.82,-127.18],
+'YYF':[49.47,-119.6],
+'YYG':[46.29,-63.13],
+'YYH':[69.55,-93.58],
+'YYJ':[48.65,-123.43],
+'YYR':[53.32,-60.43],
+'YYT':[47.62,-52.75],
+'YYZ':[43.68,-79.63],
+'YZF':[62.46,-114.44],
+'YZP':[53.25,-131.81],
+'YZV':[50.22,-66.27],
+'ZAD':[44.1,15.35],
+'ZAG':[45.74,16.07],
+'ZAL':[-39.65,-73.09],
+'ZAM':[6.92,122.06],
+'ZAZ':[41.67,-1.04],
+'ZCO':[-38.77,-72.64],
+'ZHA':[21.21,110.36],
+'ZIA':[55.55,38.15],
+'ZIH':[17.6,-101.46],
+'ZLO':[19.14,-104.56],
+'ZNE':[-29.04,114.8],
+'ZNZ':[-6.22,39.22],
+'ZOS':[-40.61,-73.06],
+'ZQN':[-45.02,168.74],
+'ZRH':[47.46,8.55],
+'ZTH':[37.75,20.88],
+'ZVM':[52.46,9.69],
+'ZYL':[24.96,91.87],
+'ABX':[-36.07,146.96],
+'ADQ':[57.75,-152.49],
+'AJA':[41.92,8.80],
+'ALA':[43.35,77.04],
+'ASB':[37.99,58.36],
+'BAN':[-4.32,15.35],
+'BBI':[20.24,85.82],
+'BBQ':[17.14,-61.79],
+'BCO':[5.78,37.32],
+'BDA':[32.36,-64.68],
+'BEB':[57.47,-7.36],
+'BGR':[44.81,-68.83],
+'BHE':[-41.52,173.87],
+'BHH':[20.00,41.63],
+'BIA':[42.55,9.48],
+'BJI':[47.50,-94.94],
+'BKQ':[-24.43,145.43],
+'BLI':[48.79,-122.54],
+'BLZ':[-15.68,34.97],
+'BMI':[40.48,-88.92],
+'BNA':[36.12,-86.68],
+'BRO':[25.91,-97.43],
+'BRR':[57.02,-7.44],
+'BTH':[1.12,104.12],
+'BWN':[4.94,114.93],
+'BZV':[-4.25,15.25],
+'CAL':[55.44,-5.69],
+'CCJ':[11.14,75.95],
+'CCT':[50.88,6.50],
+'CDC':[37.70,-113.09],
+'CFS':[-30.32,153.12],
+'CGO':[34.52,113.84],
+'CIT':[42.36,69.47],
+'CJB':[11.03,77.04],
+'CLD':[33.13,-117.28],
+'CLY':[42.53,8.79],
+'CMX':[47.17,-88.49],
+'CPC':[-40.07,-71.14],
+'CPR':[42.91,-106.46],
+'CWL':[51.40,-3.34],
+'DDC':[37.76,-100.01],
+'DND':[56.45,-3.02],
+'DPO':[-41.17,146.43],
+'DYG':[29.10,110.44],
+'DYU':[38.54,68.77],
+'EAS':[43.36,-1.79],
+'EAT':[47.40,-120.21],
+'ECN':[35.15,33.50],
+'EIS':[18.44,-64.54],
+'ERH':[31.94,-4.40],
+'ESC':[45.72,-87.09],
+'FAE':[62.06,-7.27],
+'FKS':[37.23,140.43],
+'FMN':[36.74,-108.23],
+'FRU':[42.59,74.48],
+'FSC':[41.50,9.10],
+'GAN':[-0.69,73.15],
+'GAU':[26.11,91.59],
+'GDV':[47.13,-104.81],
+'GEG':[47.62,-117.53],
+'GIB':[36.15,-5.35],
+'GNV':[29.69,-82.27],
+'GWD':[25.23,62.33],
+'HET':[40.85,111.82],
+'HEZ':[31.61,-91.30],
+'HIX':[-17.54,-149.77],
+'HLN':[46.61,-111.98],
+'HUX':[15.77,-96.26],
+'HUY':[53.58,-0.35],
+'HYS':[38.84,-99.27],
+'ICT':[37.65,-97.43],
+'IDR':[22.72,75.80],
+'ILY':[55.68,-6.25],
+'IMT':[45.82,-88.11],
+'INC':[38.32,106.39],
+'ISB':[33.62,73.10],
+'JHM':[20.96,-156.68],
+'JIO':[34.10,-117.65],
+'JJN':[24.80,118.59],
+'JNZ':[41.10,121.02],
+'KHI':[24.90,67.16],
+'KHN':[28.86,115.90],
+'KKJ':[33.85,131.04],
+'KMI':[31.87,131.45],
+'KOI':[58.96,-2.90],
+'KSA':[5.36,162.99],
+'KSC':[48.66,21.24],
+'KUH':[43.04,144.19],
+'KZO':[44.71,65.59],
+'LAN':[42.77,-84.59],
+'LCA':[34.88,33.63],
+'LDH':[-31.84,159.08],
+'LHE':[31.52,74.40],
+'LHW':[36.52,103.62],
+'LIH':[21.98,-159.34],
+'LLW':[-13.79,33.78],
+'LMD':[37.06,27.10],
+'LNO':[-20.73,116.87],
+'LNY':[20.79,-156.95],
+'LSE':[43.88,-91.26],
+'LSI':[60.16,-1.30],
+'LSQ':[-10.78,124.97],
+'LWB':[37.86,-80.40],
+'LWN':[40.75,43.85],
+'LWS':[46.37,-117.01],
+'LYA':[34.74,112.39],
+'LYB':[19.66,-80.09],
+'LYP':[31.36,72.99],
+'LYR':[78.25,15.47],
+'MAU':[-16.43,-152.24],
+'MBE':[44.30,143.41],
+'MCI':[39.29,-94.71],
+'MDT':[40.19,-76.76],
+'MEI':[32.33,-88.75],
+'MGW':[39.64,-79.92],
+'MHK':[39.14,-96.67],
+'MLH':[47.59,7.53],
+'MMT':[32.31,-90.08],
+'MPN':[-51.68,-58.45],
+'MQT':[46.53,-87.56],
+'MRY':[36.59,-121.84],
+'MUE':[20.00,-155.67],
+'MUX':[30.21,71.42],
+'NGS':[32.92,129.92],
+'NLK':[-29.04,167.94],
+'NNG':[22.61,108.17],
+'NQY':[50.44,-5.00],
+'OCE':[38.34,-75.12],
+'OGG':[20.90,-156.43],
+'OKJ':[34.76,133.86],
+'OKR':[26.82,75.81],
+'OLF':[48.09,-105.57],
+'OME':[64.51,-165.44],
+'OSS':[40.61,72.80],
+'OTH':[43.41,-124.25],
+'OTZ':[66.89,-162.60],
+'PDG':[-0.87,100.35],
+'PDX':[45.59,-122.60],
+'PEW':[33.99,71.51],
+'PFO':[34.72,32.49],
+'PHF':[37.13,-76.49],
+'PLS':[21.77,-72.27],
+'PNI':[6.99,158.21],
+'PNR':[-4.81,11.89],
+'PSP':[33.83,-116.50],
+'PST':[9.49,-75.67],
+'PUW':[46.74,-117.11],
+'PXM':[15.88,-97.09],
+'PZE':[50.11,-5.68],
+'QLS':[46.55,6.64],
+'RAR':[-21.20,-159.80],
+'RIS':[45.24,141.19],
+'RKD':[44.06,-69.10],
+'RKS':[41.59,-109.06],
+'RKV':[64.13,-21.94],
+'RNB':[56.27,15.27],
+'RNO':[39.50,-119.77],
+'ROR':[7.37,134.54],
+'RUN':[-20.89,55.51],
+'RUR':[-23.39,-151.36],
+'RVH':[37.51,-77.32],
+'RZA':[-36.87,-60.48],
+'SAN':[32.73,-117.20],
+'SBL':[13.21,-87.92],
+'SFT':[64.62,21.08],
+'SHB':[43.58,144.19],
+'SHD':[38.26,-78.90],
+'SJS':[10.00,-84.21],
+'SJW':[38.28,114.70],
+'SKD':[39.71,64.92],
+'SKT':[32.54,74.36],
+'SKZ':[27.72,68.79],
+'SMF':[38.69,-121.59],
+'SOC':[-7.52,110.76],
+'SPR':[17.91,-87.97],
+'SRG':[-6.97,110.38],
+'SSG':[3.75,8.71],
+'SWI':[51.55,-1.79],
+'SWS':[51.61,-3.86],
+'SXY':[43.88,-75.25],
+'SYY':[58.22,-6.33],
+'SZN':[34.06,-119.91],
+'SZZ':[53.58,14.90],
+'TAG':[10.26,123.85],
+'TAS':[41.26,69.28],
+'TKK':[7.46,151.84],
+'TKS':[34.13,134.61],
+'TOA':[33.80,-118.34],
+'TOY':[36.65,137.19],
+'TRE':[56.50,-6.87],
+'TTJ':[35.53,134.17],
+'TUB':[-23.37,-149.52],
+'UET':[30.25,66.94],
+'UGC':[41.58,60.64],
+'UKB':[34.63,135.22],
+'ULH':[26.48,37.90],
+'USU':[10.90,119.91],
+'VAS':[39.81,36.90],
+'VIJ':[18.46,-64.43],
+'WDH':[-22.48,17.46],
+'WNZ':[28.00,120.65],
+'WUX':[31.49,120.43],
+'WVB':[-22.99,14.65],
+'XMN':[24.54,118.13],
+'XNN':[36.53,102.04],
+'XSC':[21.52,-71.53],
+'XWA':[48.26,-103.75],
+'YAM':[46.49,-84.51],
+'YAP':[9.50,138.08],
+'YCZ':[34.67,-92.16],
+'YNB':[24.14,38.07],
+'YOS':[37.73,-119.57],
+'YUX':[68.48,-83.16],
+'YXT':[54.47,-128.58],
+'YXU':[43.03,-81.15],
+'ZEM':[52.23,-78.52],
+'ZSA':[24.08,-74.52],
+'ZSJ':[50.90,-91.76],
+'ZUH':[22.01,113.38],
+'ZWL':[52.18,-95.86]
+};
+
+// ── MAP STATE ─────────────────────────────────────────────────────────────
+let leafletMap = null;
+let mapMarkers = [];
+const isMobileView = () => window.innerWidth <= 768;
+
+// Mobile only: toggle between list and map
+function toggleView() {
+  if (!isMobileView()) return; // no-op on desktop
+  state.viewMode = state.viewMode === 'list' ? 'map' : 'list';
+  const btn        = document.getElementById('viewToggleBtn');
+  const tableWrap  = document.getElementById('tableWrapEl');
+  const mapCol     = document.getElementById('mapCol');
+  const paginationBar = document.getElementById('paginationBar');
+
+  if (state.viewMode === 'map') {
+    btn.textContent = '📋 Lista';
+    btn.classList.add('map-active');
+    tableWrap.classList.add('mobile-hidden');
+    if (paginationBar) paginationBar.style.display = 'none';
+    mapCol.classList.add('mobile-map-visible');
+    renderMap();
+  } else {
+    btn.textContent = '🗺️ Mapa';
+    btn.classList.remove('map-active');
+    tableWrap.classList.remove('mobile-hidden');
+    if (paginationBar) paginationBar.style.display = '';
+    mapCol.classList.remove('mobile-map-visible');
+  }
+}
+
+// Desktop: show mapCol and render map when data is loaded
+function showDesktopMap() {
+  if (isMobileView()) return;
+  const mapCol = document.getElementById('mapCol');
+  if (mapCol) mapCol.style.display = 'block';
+  renderMap();
+}
+
+// Hide desktop map (e.g. when switching modes / no data)
+function hideDesktopMap() {
+  if (isMobileView()) return;
+  const mapCol = document.getElementById('mapCol');
+  if (mapCol) mapCol.style.display = 'none';
+  // Destroy markers but keep leaflet instance
+  mapMarkers.forEach(m => m.remove());
+  mapMarkers = [];
+}
+
+function maybeRenderMap() {
+  if (isMobileView()) {
+    // Mobile: mapa sempre visível — renderizar sempre
+    renderMap();
+    setTimeout(() => { if (leafletMap) leafletMap.invalidateSize(true); }, 300);
+    setTimeout(() => { if (leafletMap) leafletMap.invalidateSize(true); }, 700);
+  } else {
+    // Desktop: render if mapCol is visible
+    const mapCol = document.getElementById('mapCol');
+    if (mapCol && mapCol.style.display !== 'none') renderMap();
+  }
+}
+
+
+function setMapTile(style) {
+  window._currentTile = style;
+  const urls = {
+    dark:  'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    osm:   'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    gmaps: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+  };
+  const attrs = {
+    dark:  '&copy; <a href="https://carto.com/">CARTO</a>',
+    osm:   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    gmaps: '&copy; <a href="https://carto.com/">CARTO</a>',
+  };
+  if (window._tileLayer && leafletMap) {
+    leafletMap.removeLayer(window._tileLayer);
+  }
+  window._tileLayer = L.tileLayer(urls[style], {
+    attribution: attrs[style], subdomains: 'abcd', maxZoom: 19,
+  }).addTo(leafletMap);
+  // Update button styles
+  ['dark','gmaps'].forEach(s => {
+    const btn = document.getElementById('mapTile_' + s);
+    if (!btn) return;
+    btn.classList.toggle('active', s === style);
+  });
+}
+window.setMapTile = setMapTile;
+window.toggleView = toggleView;
+
+function getBestPriceByDest(rows) {
+  const priceKey   = state.mode === 'hoteis' ? 'Final Price' : 'PREÇO';
+  const destKey    = state.mode === 'hoteis' ? 'City' : 'PARA';
+  const cityKey    = state.mode === 'hoteis' ? 'City Name' : 'CIDADE';
+  const countryKey = state.mode === 'hoteis' ? 'Country' : 'PAÍS';
+
+  const buckets = {}; // iata → array of rows sorted by price
+  for (const r of rows) {
+    const iata = (r[destKey] || '').trim().toUpperCase();
+    if (!iata) continue;
+    const coords = IATA_COORDS[iata];
+    if (!coords) continue;
+    const price = parsePrice(r[priceKey]);
+    if (!price) continue;
+    if (!buckets[iata]) buckets[iata] = [];
+    buckets[iata].push({
+      iata, price,
+      city: r[cityKey] || r[destKey] || iata,
+      country: r[countryKey] || '',
+      url: r.URL || r.url_flight || '',
+      urlHotel: r.URL || '',
+      urlVoo: r.url_flight || '',
+      hotelName: r['Hotel Name'] || '',
+      escala: (r['ESCALA'] || '').split('\n')[0].trim(),
+      ida: r['DATA_DE_IDA'] || r['Checkin_Date'] || '',
+      volta: r['DATA_VOLTA'] || r['Checkout_Date'] || '',
+      dias: r['_dias'] || r['# Days'] || '',
+    });
+  }
+  // Build result: best = cheapest per dest, top5 = cheapest 5
+  const best = {};
+  for (const iata of Object.keys(buckets)) {
+    const sorted = buckets[iata].sort((a, b) => a.price - b.price);
+    best[iata] = { ...sorted[0], top5: sorted.slice(0, 4) };
+  }
+  return best;
+}
+
+// ── MAP CONSTANTS ──────────────────────────────────────────────────────────
+const MAP_PRICE_ZOOM_THRESHOLD = 4;  // zoom mínimo para mostrar preços
+const MAP_MAX_PRICE_LABELS     = 50; // máximo de preços visíveis ao mesmo tempo
+
+// Dot marker (sempre visível) — círculo pequeno
+function makeDotIcon(accentColor) {
+  return L.divIcon({
+    className: '',
+    html: `<div style="
+      width:10px;height:10px;border-radius:50%;
+      background:${accentColor};
+      border:2px solid rgba(255,255,255,0.6);
+      box-shadow:0 1px 4px rgba(0,0,0,0.5);
+      cursor:pointer;
+    "></div>`,
+    iconSize: [10, 10],
+    iconAnchor: [5, 5],
+  });
+}
+
+// Price label marker — só aparece com zoom suficiente
+function makePriceIcon(priceStr, accentColor) {
+  const tile = window._currentTile || 'gmaps';
+  const isGmaps = tile === 'gmaps';
+  const isDark  = tile === 'dark';
+  const textColor   = (isDark || !isGmaps) ? '#fff' : '#000';
+  const borderColor = isGmaps ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.25)';
+  return L.divIcon({
+    className: '',
+    html: `<div style="
+      background:${accentColor};color:${textColor};
+      font-family:'Space Mono',monospace;font-size:10px;font-weight:700;
+      padding:2px 7px;border-radius:10px;white-space:nowrap;
+      box-shadow:0 2px 8px rgba(0,0,0,0.3);cursor:pointer;
+      border:1.5px solid ${borderColor};
+    ">${priceStr}</div>`,
+    iconAnchor: [0, 0],
+  });
+}
+
+// Build voos popup — top 3 cheapest flights per destination
+function _buildVoosPopup(p, color) {
+  const items = (p.top5 || [p]).slice(0, 3).map(h => {
+    const priceStr = `R$ ${fmtN(h.price)}`;
+    const idaFmt   = h.ida   ? fmtDate(h.ida)   : '';
+    const voltaFmt = h.volta && h.volta !== '-' ? fmtDate(h.volta) : '';
+    const diasStr  = h.dias  ? `${h.dias}d` : '';
+    const escala   = h.escala ? `<span style="font-size:9px;color:#888;margin-left:4px">${h.escala}</span>` : '';
+    const dateRow  = idaFmt
+      ? `<div style="font-size:10px;color:#5a6072;margin:1px 0">✈️ ${idaFmt}${voltaFmt ? ` → ${voltaFmt}` : ''}${diasStr ? ` · ${diasStr}` : ''}</div>`
+      : '';
+    const linkBtn  = h.url
+      ? `<a href="${h.url}" target="_blank" rel="noopener" style="font-size:10px;padding:2px 7px;border-radius:4px;background:#e8f0ff;color:#0052cc;font-weight:600;text-decoration:none;white-space:nowrap">✈️ Ver voo</a>`
+      : '';
+    return `<div style="border-top:1px solid #eee;padding:5px 0 2px">
+      <div style="display:flex;align-items:center;gap:4px">
+        <span style="font-size:12px;font-weight:700;color:${color}">${priceStr}</span>${escala}
+      </div>
+      ${dateRow}
+      <div style="margin-top:3px">${linkBtn}</div>
+    </div>`;
+  }).join('');
+  return `<div style="min-width:200px;max-width:260px">
+    <div style="font-size:13px;font-weight:700;color:#1a1d27;margin-bottom:4px">${p.city}${p.country ? ` <span style="font-weight:400;color:#9ba3b5">(${p.country})</span>` : ''}</div>
+    ${items}
+  </div>`;
+}
+
+// Build hoteis popup content — top 5 hotels per destination
+function _buildHoteisPopup(p, color) {
+  const items = (p.top5 || [p]).slice(0, 4).map(h => {
+    const priceStr = `R$ ${fmtN(h.price)}`;
+    const idaFmt   = h.ida   ? fmtDate(h.ida)   : '';
+    const voltaFmt = h.volta && h.volta !== '-' ? fmtDate(h.volta) : '';
+    const diasStr  = h.dias  ? `${h.dias}d` : '';
+    const dateRow  = idaFmt ? `<div style="font-size:10px;color:#5a6072;margin:1px 0">✈️ ${idaFmt}${voltaFmt ? ` → ${voltaFmt}` : ''}${diasStr ? ` · ${diasStr}` : ''}</div>` : '';
+    const vooBtn   = h.urlVoo   ? `<a href="${h.urlVoo}"   target="_blank" rel="noopener" style="font-size:10px;padding:2px 7px;border-radius:4px;background:#e8f0ff;color:#0052cc;font-weight:600;text-decoration:none;white-space:nowrap">✈️ Voo</a>` : '';
+    const hotelBtn = h.urlHotel ? `<a href="${h.urlHotel}" target="_blank" rel="noopener" style="font-size:10px;padding:2px 7px;border-radius:4px;background:#fff3cd;color:#856404;font-weight:600;text-decoration:none;white-space:nowrap">🏨 Hotel</a>` : '';
+    return `<div style="border-top:1px solid #eee;padding:5px 0 2px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
+        <span style="font-size:12px;font-weight:700;color:${color}">${priceStr}</span>
+        <span style="font-size:10px;color:#5a6072;flex:1;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${h.hotelName || ''}</span>
+      </div>
+      ${dateRow}
+      <div style="display:flex;gap:4px;margin-top:3px">${vooBtn}${hotelBtn}</div>
+    </div>`;
+  }).join('');
+  return `<div style="min-width:220px;max-width:280px">
+    <div style="font-size:13px;font-weight:700;color:#1a1d27;margin-bottom:4px">${p.city}${p.country ? ` <span style="font-weight:400;color:#9ba3b5">(${p.country})</span>` : ''}</div>
+    ${items}
+  </div>`;
+}
+
+// Price labels layer — rebuilt on every zoom/pan
+let _mapPoints    = [];   // all points (persists across zoom)
+let _dotMarkers   = [];   // dot markers (rebuilt on renderMap)
+let _priceMarkers = [];   // price labels (rebuilt on moveend/zoomend)
+let _mapListening = false;
+
+// Quartile color: Q1=green, Q2=yellow, Q3+Q4=red — relative to visible 50
+function _quartileColor(rank, total) {
+  const pct = rank / total;
+  if (pct <= 0.25) return '#00875a'; // Q1 — verde
+  if (pct <= 0.50) return '#f59e0b'; // Q2 — amarelo
+  return '#e85d04';                   // Q3+Q4 — vermelho
+}
+
+function _rebuildPriceLabels() {
+  if (!leafletMap) return;
+
+  // Remove old price labels
+  _priceMarkers.forEach(m => m.remove());
+  _priceMarkers = [];
+
+  const zoom = leafletMap.getZoom();
+  const showPrices = zoom >= MAP_PRICE_ZOOM_THRESHOLD;
+
+  // Show/hide dot markers based on zoom — dots only when prices are hidden
+  _dotMarkers.forEach(m => {
+    const el = m.getElement();
+    if (el) el.style.display = showPrices ? 'none' : '';
+  });
+
+  if (!showPrices) return;
+
+  const bounds = leafletMap.getBounds();
+
+  // Filter points inside current viewport
+  const inView = _mapPoints.filter(p => {
+    const coords = IATA_COORDS[p.iata];
+    return coords && bounds.contains(coords);
+  });
+
+  // Sort by price, take cheapest 50
+  inView.sort((a, b) => a.price - b.price);
+  const top50 = inView.slice(0, MAP_MAX_PRICE_LABELS);
+  const total  = top50.length;
+
+  top50.forEach((p, rank) => {
+    const [lat, lng] = IATA_COORDS[p.iata];
+    const priceStr = `R$ ${fmtN(p.price)}`;
+    const color    = _quartileColor(rank, total);
+
+    const icon = makePriceIcon(priceStr, color);
+    const marker = L.marker([lat, lng], { icon, zIndexOffset: 1000 });
+
+    const idaFmt   = p.ida   ? fmtDate(p.ida)   : '';
+    const voltaFmt = p.volta && p.volta !== '-' ? fmtDate(p.volta) : '';
+    const diasStr  = p.dias  ? `${p.dias}d`     : '';
+    const linkBtn  = p.url   ? `<a href="${p.url}" target="_blank" rel="noopener noreferrer" class="map-popup-link">✈️ Ver oferta</a>` : '';
+
+    const popupContent = state.mode === 'hoteis'
+      ? _buildHoteisPopup(p, color)
+      : _buildVoosPopup(p, color);
+    marker.bindPopup(popupContent, { maxWidth: 300 });
+
+    marker.addTo(leafletMap);
+    _priceMarkers.push(marker);
+  });
+}
+
+function renderMap() {
+  const mapEl = document.getElementById('mapView');
+  if (!mapEl) return;
+
+  const allRows = getAllFiltered();
+  const bestByDest = getBestPriceByDest(allRows);
+  _mapPoints = Object.values(bestByDest);
+
+  // Init map once
+  if (!leafletMap) {
+    leafletMap = L.map('mapView', {
+      center: [15, 0], zoom: 2, minZoom: 1, maxZoom: 14,
+    });
+    const _tileUrls = {
+      dark:  'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+      osm:   'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      gmaps: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+    };
+    const _tileAttr = {
+      dark:  '&copy; <a href="https://carto.com/">CARTO</a>',
+      osm:   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      gmaps: '&copy; <a href="https://carto.com/">CARTO</a>',
+    };
+    window._currentTile = window._currentTile || 'gmaps';
+    window._tileLayer = L.tileLayer(_tileUrls[window._currentTile], {
+      attribution: _tileAttr[window._currentTile],
+      subdomains: 'abcd', maxZoom: 19,
+    }).addTo(leafletMap);
+  }
+
+  // Remove old dot markers
+  _dotMarkers.forEach(m => m.remove());
+  _dotMarkers = [];
+  _priceMarkers.forEach(m => m.remove());
+  _priceMarkers = [];
+
+  // Remove old mapMarkers (legacy)
+  mapMarkers.forEach(m => m.remove());
+  mapMarkers = [];
+
+  const accentColor = state.mode === 'voos' ? '#00875a' : '#0052cc';
+  const dotIcon = makeDotIcon(accentColor);
+
+  // Add dot for every destination (always visible)
+  _mapPoints.forEach(p => {
+    const coords = IATA_COORDS[p.iata];
+    if (!coords) return;
+    const [lat, lng] = coords;
+
+    const dot = L.marker([lat, lng], { icon: dotIcon });
+
+    // Dot popup shows price on click even at low zoom
+    const priceStr = `R$ ${fmtN(p.price)}`;
+    const idaFmt   = p.ida   ? fmtDate(p.ida)   : '';
+    const voltaFmt = p.volta && p.volta !== '-' ? fmtDate(p.volta) : '';
+    const diasStr  = p.dias  ? `${p.dias}d`     : '';
+    const linkBtn  = p.url   ? `<a href="${p.url}" target="_blank" rel="noopener noreferrer" class="map-popup-link">✈️ Ver oferta</a>` : '';
+
+    const dotPopup = state.mode === 'hoteis'
+      ? _buildHoteisPopup(p, '#0052cc')
+      : _buildVoosPopup(p, '#00875a');
+    dot.bindPopup(dotPopup, { maxWidth: 300 });
+
+    dot.addTo(leafletMap);
+    _dotMarkers.push(dot);
+  });
+
+  // Listen to zoom/pan — rebuild price labels on every move
+  if (!_mapListening) {
+    _mapListening = true;
+    leafletMap.on('moveend zoomend', _rebuildPriceLabels);
+  }
+
+  // Initial price labels
+  _rebuildPriceLabels();
+
+  if (_mapPoints.length > 0) {
+    const coords = _mapPoints
+      .filter(p => IATA_COORDS[p.iata])
+      .map(p => IATA_COORDS[p.iata]);
+    try { leafletMap.fitBounds(L.latLngBounds(coords), { padding: [30, 30], maxZoom: 5 }); } catch(e) {}
+  }
+
+  setTimeout(() => { if (leafletMap) leafletMap.invalidateSize(true); }, 80);
+  setTimeout(() => { if (leafletMap) leafletMap.invalidateSize(true); }, 400);
+}
+
+
+function setMapTile(style) {
+  window._currentTile = style;
+  const urls = {
+    dark:  'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    osm:   'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    gmaps: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+  };
+  const attrs = {
+    dark:  '&copy; <a href="https://carto.com/">CARTO</a>',
+    osm:   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    gmaps: '&copy; <a href="https://carto.com/">CARTO</a>',
+  };
+  if (window._tileLayer && leafletMap) {
+    leafletMap.removeLayer(window._tileLayer);
+  }
+  window._tileLayer = L.tileLayer(urls[style], {
+    attribution: attrs[style], subdomains: 'abcd', maxZoom: 19,
+  }).addTo(leafletMap);
+  // Update button styles
+  ['dark','gmaps'].forEach(s => {
+    const btn = document.getElementById('mapTile_' + s);
+    if (!btn) return;
+    btn.classList.toggle('active', s === style);
+  });
+}
+window.setMapTile = setMapTile;
+window.toggleView = toggleView;
+</script>
+</body>
+</html>
