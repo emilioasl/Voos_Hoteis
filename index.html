@@ -1229,11 +1229,13 @@ async function loadFromGitHub() {
       })
       .map(f => ({ path: f.path, name: f.path.split('/').pop() }));
 
-    // Ordena pelo nome (YYYY-MM-DD está embutido), pega os mais recentes
-    files.sort((a, b) => a.name.localeCompare(b.name));
+    // Ordena pelo timestamp extraído do NOME do arquivo — prefixos como "____" não interferem
+    files.forEach(f => { f._nameTs = dateToTs(extractDate(f.name)); });
+    files.sort((a, b) => a._nameTs - b._nameTs);
     if (files.length > MAX_FILES) files = files.slice(-MAX_FILES);
-    // Mais recente = último da lista ordenada
-    files.forEach((f, i) => { f.isLatest = i === files.length - 1; });
+    // Mais recente = arquivo com maior data no nome (não o último alfabético)
+    const _maxNameTs = Math.max(...files.map(f => f._nameTs));
+    files.forEach(f => { f.isLatest = f._nameTs === _maxNameTs; });
 
     // ── Em modo hoteis: também carrega CSVs de voos (ida+volta, ECO) para join ──
     let vooFilesForJoin = [];
@@ -1247,7 +1249,8 @@ async function loadFromGitHub() {
           return true;
         })
         .map(f => ({ path: f.path, name: f.path.split('/').pop() }));
-      vooFilesForJoin.sort((a, b) => a.name.localeCompare(b.name));
+      vooFilesForJoin.forEach(f => { f._nameTs = dateToTs(extractDate(f.name)); });
+      vooFilesForJoin.sort((a, b) => a._nameTs - b._nameTs);
     }
 
     // Carrega todos os arquivos
@@ -1455,11 +1458,18 @@ async function loadFromGitHub() {
         const checkout = (r['Checkout_Date'] || '').trim().substring(0, 10);
         if (!iata || !checkin || !checkout) continue;
         const voo = vooMap[`${iata}|${checkin}|${checkout}`];
-        if (voo) {
-          const hotelPrice  = parsePrice(r['Price']) || 0;
-          r['Air Price']    = voo.preco;
-          r['url_flight']   = voo.url;
-          r['Final Price']  = Math.round(hotelPrice + voo.preco);
+        const hotelPrice = parsePrice(r['Price']) || 0;
+        const isCarDest  = ['GRU','CGH','SAO'].includes(iata);
+        if (isCarDest) {
+          // Destino local: carro R$100 fixo, sem voo
+          r['Air Price']   = 100;
+          r['url_flight']  = '';
+          r['Final Price'] = Math.round(hotelPrice + 100);            // hotel(1x) + carro(1x)
+        } else if (voo) {
+          // Destino com voo: passagem × 3 pax
+          r['Air Price']   = voo.preco;
+          r['url_flight']  = voo.url;
+          r['Final Price'] = Math.round(hotelPrice + voo.preco * 3);  // hotel(1x) + passagem(3x)
         }
       }
     }
@@ -5022,14 +5032,10 @@ function _rebuildPriceLabels() {
   const bWest = bounds.getWest();
   const bEast = bounds.getEast();
 
-  // Helper: check if a longitude is inside the (possibly world-wrapped) viewport.
-  // When the map has been panned past ±180°, getWest/getEast can be outside [-180,180].
-  // We normalize the point longitude into the same "copy" as the viewport center to compare correctly.
+  // Longitude check that handles world-wrapping (getWest/getEast can exceed ±180 after panning)
   function _lngInBounds(lng) {
-    // Width of viewport in degrees
     const width = bEast - bWest;
-    if (width >= 360) return true; // entire world visible
-    // Shift lng into the same 360° window as bWest
+    if (width >= 360) return true;
     let l = lng;
     while (l < bWest) l += 360;
     while (l > bWest + 360) l -= 360;
@@ -5041,8 +5047,7 @@ function _rebuildPriceLabels() {
     const coords = IATA_COORDS[p.iata];
     if (!coords) return false;
     const [lat, lng] = coords;
-    const latOk = lat >= bounds.getSouth() && lat <= bounds.getNorth();
-    return latOk && _lngInBounds(lng);
+    return lat >= bounds.getSouth() && lat <= bounds.getNorth() && _lngInBounds(lng);
   });
 
   // Sort by price, take cheapest 50
@@ -5052,12 +5057,9 @@ function _rebuildPriceLabels() {
 
   top50.forEach((p, rank) => {
     const [lat, lng] = IATA_COORDS[p.iata];
-
-    // Place marker at the wrapped longitude matching the current viewport
     let markerLng = lng;
     while (markerLng < bWest) markerLng += 360;
     while (markerLng > bWest + 360) markerLng -= 360;
-
     const priceStr = `R$ ${fmtN(p.price)}`;
     const color    = _quartileColor(rank, total);
 
