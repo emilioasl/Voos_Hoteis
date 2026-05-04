@@ -5019,11 +5019,30 @@ function _rebuildPriceLabels() {
   if (!showPrices) return;
 
   const bounds = leafletMap.getBounds();
+  const bWest = bounds.getWest();
+  const bEast = bounds.getEast();
 
-  // Filter points inside current viewport
+  // Helper: check if a longitude is inside the (possibly world-wrapped) viewport.
+  // When the map has been panned past ±180°, getWest/getEast can be outside [-180,180].
+  // We normalize the point longitude into the same "copy" as the viewport center to compare correctly.
+  function _lngInBounds(lng) {
+    // Width of viewport in degrees
+    const width = bEast - bWest;
+    if (width >= 360) return true; // entire world visible
+    // Shift lng into the same 360° window as bWest
+    let l = lng;
+    while (l < bWest) l += 360;
+    while (l > bWest + 360) l -= 360;
+    return l <= bEast;
+  }
+
+  // Filter points inside current viewport (handles world wrapping)
   const inView = _mapPoints.filter(p => {
     const coords = IATA_COORDS[p.iata];
-    return coords && bounds.contains(coords);
+    if (!coords) return false;
+    const [lat, lng] = coords;
+    const latOk = lat >= bounds.getSouth() && lat <= bounds.getNorth();
+    return latOk && _lngInBounds(lng);
   });
 
   // Sort by price, take cheapest 50
@@ -5033,11 +5052,17 @@ function _rebuildPriceLabels() {
 
   top50.forEach((p, rank) => {
     const [lat, lng] = IATA_COORDS[p.iata];
+
+    // Place marker at the wrapped longitude matching the current viewport
+    let markerLng = lng;
+    while (markerLng < bWest) markerLng += 360;
+    while (markerLng > bWest + 360) markerLng -= 360;
+
     const priceStr = `R$ ${fmtN(p.price)}`;
     const color    = _quartileColor(rank, total);
 
     const icon = makePriceIcon(priceStr, color);
-    const marker = L.marker([lat, lng], { icon, zIndexOffset: 1000 });
+    const marker = L.marker([lat, markerLng], { icon, zIndexOffset: 1000 });
 
     const idaFmt   = p.ida   ? fmtDate(p.ida)   : '';
     const voltaFmt = p.volta && p.volta !== '-' ? fmtDate(p.volta) : '';
@@ -5066,6 +5091,7 @@ function renderMap() {
   if (!leafletMap) {
     leafletMap = L.map('mapView', {
       center: [15, 0], zoom: 2, minZoom: 1, maxZoom: 14,
+      worldCopyJump: true,
     });
     const _tileUrls = {
       dark:  'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
