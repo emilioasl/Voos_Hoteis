@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="pt-BR"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Abrindo o voo…</title>
+<style>body{font-family:-apple-system,system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;color:#333;text-align:center}a{color:#00875a;font-weight:600}</style>
+</head><body>
+<div><p>Abrindo o voo…</p><p id="manual" style="display:none"><a id="lnk" href="#">Toque aqui se não abrir</a></p></div>
+<script>
+// Página "ponte": no Safari do iPhone, um TOQUE num link do google.com abre o app do
+// Google (que descarta a busca). Um redirecionamento feito pela página fica no Safari.
+(function () {
+  var u = '';
+  try { u = decodeURIComponent((location.hash || '').slice(1)); } catch (e) {}
+  var ok = /^https:\/\/(www\.)?google\.com\/travel\//.test(u) || /^https:\/\/([a-z0-9-]+\.)*(latamairlines\.com|voegol\.com\.br)\//.test(u);
+  if (!ok) { document.body.innerHTML = '<p>Link inválido.</p>'; return; }
+  document.getElementById('lnk').href = u;
+  setTimeout(function () { document.getElementById('manual').style.display = 'block'; }, 2500);
+  location.replace(u);
+})();
+</script>
+</body></html>
