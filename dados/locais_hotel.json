@@ -1,0 +1,137 @@
+[
+ {
+  "chave": "praia do espelho",
+  "rotulo": "Praia do Espelho (Bahia)",
+  "lat": -16.72579,
+  "lng": -39.12246,
+  "iatas": [
+   "BPS"
+  ]
+ },
+ {
+  "chave": "maragogi",
+  "rotulo": "Maragogi",
+  "lat": -8.96844,
+  "lng": -35.28972,
+  "iatas": [
+   "MCZ"
+  ]
+ },
+ {
+  "chave": "milagres",
+  "rotulo": "Milagres",
+  "lat": -9.23797,
+  "lng": -35.39109,
+  "iatas": [
+   "MCZ"
+  ]
+ },
+ {
+  "chave": "porto de galinhas",
+  "rotulo": "Porto de Galinhas",
+  "lat": -8.50079,
+  "lng": -35.00303,
+  "iatas": [
+   "REC"
+  ]
+ },
+ {
+  "chave": "praia da pipa",
+  "rotulo": "Pipa",
+  "lat": -5.87318,
+  "lng": -35.18716,
+  "iatas": [
+   "NAT"
+  ]
+ },
+ {
+  "chave": "chapada dos guimaraes",
+  "rotulo": "Chapada dos Guimarães",
+  "lat": -15.46434,
+  "lng": -55.74986,
+  "iatas": [
+   "CGB"
+  ]
+ },
+ {
+  "chave": "ibiuna",
+  "rotulo": "Ibiúna",
+  "lat": -23.65448,
+  "lng": -47.22086,
+  "iatas": [
+   "CGH"
+  ]
+ },
+ {
+  "chave": "piedade",
+  "rotulo": "Piedade",
+  "lat": -23.70741,
+  "lng": -47.42523,
+  "iatas": [
+   "CGH"
+  ]
+ },
+ {
+  "chave": "amparo",
+  "rotulo": "Amparo",
+  "lat": -22.70111,
+  "lng": -46.76444,
+  "iatas": [
+   "CGH"
+  ]
+ },
+ {
+  "chave": "itu",
+  "rotulo": "Itu",
+  "lat": -23.26378,
+  "lng": -47.29985,
+  "iatas": [
+   "CGH"
+  ]
+ },
+ {
+  "chave": "sao roque",
+  "rotulo": "São Roque",
+  "lat": -23.53213,
+  "lng": -47.07889,
+  "iatas": [
+   "CGH"
+  ]
+ },
+ {
+  "chave": "socorro",
+  "rotulo": "Socorro",
+  "lat": -22.59026,
+  "lng": -46.52491,
+  "iatas": [
+   "CGH"
+  ]
+ },
+ {
+  "chave": "camburiu",
+  "rotulo": "Balneário Camburiú",
+  "lat": -26.95694,
+  "lng": -48.63765,
+  "iatas": [
+   "JOI"
+  ]
+ },
+ {
+  "chave": "beto",
+  "rotulo": "Beto Carreiro",
+  "lat": -26.77542,
+  "lng": -48.64653,
+  "iatas": [
+   "NVT"
+  ]
+ },
+ {
+  "chave": "brotas",
+  "rotulo": "Brotas",
+  "lat": -22.29009,
+  "lng": -48.10513,
+  "iatas": [
+   "CGH"
+  ]
+ }
+]

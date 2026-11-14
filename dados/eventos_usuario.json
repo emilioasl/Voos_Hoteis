@@ -1,0 +1,41 @@
+{
+ "versao": 1,
+ "atualizado": "2026-11-14 07:06",
+ "eventos": [
+  {
+   "id": "ferias0",
+   "tipo": "ferias",
+   "nome": "Minhas férias",
+   "ini": "2026-12-24",
+   "fim": "2027-01-09"
+  },
+  {
+   "id": "d2f81e45",
+   "tipo": "viagem",
+   "nome": "Aniversario do Nicola",
+   "ini": "2027-02-26",
+   "fim": "2027-02-28"
+  },
+  {
+   "id": "690e53a5",
+   "tipo": "viagem",
+   "nome": "Buzios Amigos",
+   "ini": "2027-04-02",
+   "fim": "2027-04-04"
+  },
+  {
+   "id": "923ec09f",
+   "tipo": "viagem",
+   "nome": "Buzios",
+   "ini": "2027-05-07",
+   "fim": "2027-05-09"
+  },
+  {
+   "id": "95b36852",
+   "tipo": "viagem",
+   "nome": "Fortaleza",
+   "ini": "2027-06-11",
+   "fim": "2027-06-13"
+  }
+ ]
+}

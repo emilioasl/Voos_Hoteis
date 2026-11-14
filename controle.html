@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Controle do Robô</title>
+<style>
+:root {
+  --bg: #f4f5f8; --card: #fff; --text: #1d2130; --muted: #6b7286; --dim: #9aa1b2; --border: #dfe2ea;
+  --accent: #1a56db; --ok: #0a7d20; --warn: #b36b00; --err: #c62828;
+  --b-success: #2e9b4b; --b-danger: #d9534f; --b-primary: #1a73e8; --b-warning: #f0a020; --b-info: #17a2b8;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+html { color-scheme: light; }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; }
+a { color: var(--accent); }
+header { position: sticky; top: 0; z-index: 20; background: #fff; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 8px; padding: 10px 16px; flex-wrap: wrap; }
+header h1 { white-space: nowrap; }
+header { zoom: 0.8; }
+@media (max-width: 520px) { header { padding: 8px 10px; } header h1 { font-size: 14px; } #pill { font-size: 11px; } #envio { width: 100%; margin-left: 0; } #envio:empty { display: none; } }
+header h1 { font-size: 16px; margin: 0; font-weight: 700; }
+header .voltar { text-decoration: none; font-size: 13px; color: var(--muted); border: 1px solid var(--border);
+  border-radius: 8px; padding: 5px 10px; }
+#pill { font-size: 12px; padding: 4px 10px; border-radius: 20px; background: #eef0f5; color: var(--muted); }
+#pill.ok { background: #e3f4e7; color: var(--ok); } #pill.warn { background: #fff3df; color: var(--warn); }
+#pill.err { background: #fde8e8; color: var(--err); }
+#envio { font-size: 12px; color: var(--muted); margin-left: auto; }
+#cfgBtn { border: 1px solid var(--border); background: #fff; border-radius: 8px; padding: 5px 9px; cursor: pointer; }
+main { padding: 12px 16px 80px; max-width: 1400px; margin: 0 auto; zoom: 0.7; }
+.rola { overflow: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; border-radius: 6px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+#setup { max-width: 560px; margin: 24px auto; }
+#setup h2 { margin-top: 0; font-size: 18px; }
+#setup ol { padding-left: 20px; line-height: 1.6; color: #333; }
+#setup input { width: 100%; padding: 9px 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; margin: 4px 0 10px; }
+#setup .row { display: flex; gap: 8px; }
+.bt-main { background: var(--accent); color: #fff; border: 0; border-radius: 8px; padding: 9px 18px; font-weight: 600; cursor: pointer; font-size: 14px; }
+#msgSetup { font-size: 13px; margin-top: 8px; }
+/* abas do painel */
+.tabs { display: flex; gap: 4px; overflow-x: auto; border-bottom: 1px solid var(--border); margin-bottom: 10px; scrollbar-width: none; }
+.tabs button { border: 1px solid transparent; border-bottom: none; background: transparent; padding: 9px 14px; font-size: 14px;
+  cursor: pointer; border-radius: 8px 8px 0 0; color: var(--muted); white-space: nowrap; font-family: var(--sans); }
+.tabs button.on { background: #fff; border-color: var(--border); color: var(--text); font-weight: 600; margin-bottom: -1px; }
+.tabpane { background: #fff; border: 1px solid var(--border); border-top: none; border-radius: 0 0 12px 12px; padding: 12px; }
+/* widgets */
+.bx { display: flex; gap: 6px; min-width: 0; }
+.bx.h { flex-direction: row; flex-wrap: wrap; align-items: center; }
+.bx.v { flex-direction: column; }
+.wd { max-width: 100%; }
+.lbl-d { font-size: 13px; color: #333; margin-right: 4px; white-space: nowrap; }
+.btn { border: 1px solid #c9cdd8; background: #eef0f4; color: #222; border-radius: 6px; padding: 7px 12px; font-size: 13px;
+  cursor: pointer; font-family: var(--sans); max-width: 100%; min-height: 32px; }
+.btn:active { transform: translateY(1px); }
+.btn[disabled] { opacity: .45; cursor: not-allowed; }
+.btn.st-success { background: var(--b-success); border-color: var(--b-success); color: #fff; }
+.btn.st-danger { background: var(--b-danger); border-color: var(--b-danger); color: #fff; }
+.btn.st-primary { background: var(--b-primary); border-color: var(--b-primary); color: #fff; }
+.btn.st-warning { background: var(--b-warning); border-color: var(--b-warning); color: #fff; }
+.btn.st-info { background: var(--b-info); border-color: var(--b-info); color: #fff; }
+.btn.enviando { outline: 2px solid var(--accent); outline-offset: 1px; }
+.chk { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; cursor: pointer; min-height: 28px; }
+.chk input { width: 17px; height: 17px; margin: 0; }
+.txt, .num, .sel, .date, .area, .multi { border: 1px solid #c9cdd8; border-radius: 6px; padding: 6px 8px; font-size: 14px;
+  font-family: var(--sans); background: #fff; max-width: 100%; min-height: 32px; }
+.area { width: 100%; min-height: 70px; }
+.multi { min-width: 200px; }
+.mlist { padding: 3px; max-height: 210px; overflow: auto; overscroll-behavior: contain; min-height: 40px; width: 100%; }
+.mitem { padding: 6px 8px; border-radius: 4px; cursor: pointer; font-size: 14px; user-select: none; border-bottom: 1px solid #f0f1f4; }
+.mitem.on { background: #dbe6fb; font-weight: 600; }
+.mitem.on::before { content: "✓ "; color: var(--accent); }
+.mvazio { color: var(--dim); font-size: 13px; padding: 6px 8px; }
+.tog { display: inline-flex; flex-wrap: wrap; gap: 3px; }
+.tog button { border: 1px solid #c9cdd8; background: #eef0f4; padding: 7px 12px; border-radius: 6px; font-size: 13px; cursor: pointer; font-family: var(--sans); }
+.tog button.on { background: #cfd6e6; border-color: #9aa6c2; font-weight: 600; box-shadow: inset 0 1px 3px rgba(0,0,0,.15); }
+.html { min-width: 0; max-width: 100%; overflow-x: auto; }
+.html table { border-collapse: collapse; }
+.html pre { white-space: pre-wrap; word-break: break-word; }
+.out { white-space: pre-wrap; font-family: var(--mono); font-size: 11px; background: #f6f7f9; border-radius: 6px; padding: 8px; max-height: 360px; overflow: auto; width: 100%; }
+.pend { box-shadow: 0 0 0 2px #ffd28a; border-radius: 6px; }
+#vazio { text-align: center; color: var(--muted); padding: 50px 10px; }
+@media (max-width: 700px) {
+  main { padding: 10px 10px 80px; }
+  .tabpane { padding: 8px; }
+  .html { font-size: 13px; }
+  .bx.h > .wd[style*="width"] { max-width: 100%; }
+}
+</style>
+</head>
+<body>
+<header>
+  <a class="voltar" href="index.html">← Site</a>
+  <h1>🎛️ Controle do Robô</h1>
+  <span id="pill">conectando…</span>
+  <span id="envio"></span>
+  <button id="cfgBtn" title="Configurar acesso" onclick="mostrarSetup(true)">⚙️</button>
+</header>
+<main>
+  <div id="setup" class="card" style="display:none">
+    <h2>Conectar ao seu robô</h2>
+    <p style="color:#555;font-size:13px">O site conversa com o seu PC por um repositório <b>privado</b> do GitHub.
+      Cole aqui um token que só tenha acesso a esse repositório. Ele fica guardado <b>só neste navegador</b>.</p>
+    <label style="font-size:13px">Repositório (dono/nome)</label>
+    <input id="inRepo" value="emilioasl/Voos_Comandos" autocomplete="off">
+    <label style="font-size:13px">Token do GitHub</label>
+    <input id="inToken" type="password" placeholder="github_pat_..." autocomplete="off">
+    <div class="row"><button class="bt-main" onclick="salvarSetup()">Conectar</button>
+      <button class="btn" id="btSair" onclick="esquecer()">Esquecer token</button></div>
+    <div id="msgSetup"></div>
+    <div id="linkBox" style="display:none;margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
+      <div style="font-size:13px;font-weight:600">📲 Não pedir o token de novo</div>
+      <div style="font-size:12px;color:#555;margin:4px 0 8px">Toque em <b>Abrir link com acesso</b> e, na página que abrir,
+        use <b>Adicionar à Tela de Início</b> (iPhone: botão compartilhar · Android: menu ⋮). O ícone já entra conectado.
+        <b>Não mande esse link para ninguém</b> — ele leva o token junto.</div>
+      <button class="btn" onclick="abrirLinkComToken()">Abrir link com acesso</button>
+      <div style="font-size:13px;font-weight:600;margin-top:14px">📝 Link para outra pessoa pedir hotéis</div>
+      <div style="font-size:12px;color:#555;margin:4px 0 8px">Abre o site direto no pop-up <b>📝 Solicitação</b>, já com a chave
+        (ex.: para sua esposa pedir hotéis e datas sem você). Mande só para quem você confia — com a chave dá para mexer no robô.</div>
+      <button class="btn" onclick="copiarLinkSolicitacao()">Copiar link da Solicitação</button>
+      <div id="linkSolic" style="font-size:11px;color:#555;word-break:break-all;margin-top:6px"></div>
+    </div>
+  </div>
+  <div id="painel"></div>
+  <div id="vazio" style="display:none"></div>
+</main>
+<script>
+'use strict';
+// ══════════════════════════════════════════════════════════════════════════
+// Controle do robô pelo site.
+// O PC (robo_remoto.py) publica o painel inteiro em painel.json (ramo "status")
+// de um repositório privado; aqui ele é desenhado. O que você mexe vira um
+// pedido em cmd.json (ramo "comandos"), que o PC executa no painel de verdade.
+// ══════════════════════════════════════════════════════════════════════════
+const LS = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
+  del(k) { try { localStorage.removeItem(k); } catch (e) {} },
+};
+// O token fica guardado em 3 lugares (alguns celulares/apps apagam um deles):
+// localStorage, cookie (1 ano) e, se você quiser, no próprio link (#t=...) salvo na tela inicial.
+const CK = {
+  get(k) { try { const m = document.cookie.match(new RegExp('(?:^|; )' + k + '=([^;]*)')); return m ? decodeURIComponent(m[1]) : ''; } catch (e) { return ''; } },
+  set(k, v) { try { document.cookie = `${k}=${encodeURIComponent(v)}; max-age=31536000; path=/; SameSite=Strict; Secure`; } catch (e) {} },
+  del(k) { try { document.cookie = `${k}=; max-age=0; path=/; SameSite=Strict; Secure`; } catch (e) {} },
+};
+function tokenDoLink() {
+  const m = (location.hash || '').match(/[#&]t=([^&]+)/);
+  return m ? decodeURIComponent(m[1]) : '';
+}
+function guardarToken(t) { LS.set('ctl_token', t); CK.set('ctl_token', t); }
+let CFG = { repo: LS.get('ctl_repo', 'emilioasl/Voos_Comandos'),
+            token: tokenDoLink() || LS.get('ctl_token', '') || CK.get('ctl_token') };
+if (CFG.token) guardarToken(CFG.token);
+const st = {
+  painel: null, etag: null, assin: null, aba: parseInt(LS.get('ctl_aba', '0')) || 0,
+  pend: new Map(),          // id -> valor ainda não confirmado pelo PC
+  fila: [],                 // ops esperando envio
+  enviados: [],             // [{id, ops}] aguardando o PC
+  enviando: false, timerEnvio: null, ultimoPing: 0, erro: '', carregou: false,
+  arqPainel: 'painel.json.gz', abriuEm: Date.now(),
+};
+
+const api = (caminho, opt = {}) => fetch(`https://api.github.com/repos/${CFG.repo}${caminho ? '/' + caminho : ''}`, {
+  cache: 'no-store', ...opt,
+  headers: { Authorization: `Bearer ${CFG.token}`, 'X-GitHub-Api-Version': '2022-11-28', ...(opt.headers || {}) },
+});
+const b64dec = s => new TextDecoder().decode(Uint8Array.from(atob(s.replace(/\n/g, '')), c => c.charCodeAt(0)));
+const b64enc = s => { const b = new TextEncoder().encode(s); let r = ''; for (let i = 0; i < b.length; i += 0x8000) r += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); return btoa(r); };
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+// ── setup ──────────────────────────────────────────────────────────────────
+function copiarLinkSolicitacao() {
+  const url = new URL('index.html', location.href).href + '#solicitar&t=' + encodeURIComponent(CFG.token);
+  const box = document.getElementById('linkSolic');
+  const ok = () => { box.innerHTML = '✅ Copiado! Cole no WhatsApp/mensagem. <br>' + esc(url); };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(ok, () => { box.textContent = url; });
+  else box.textContent = url;
+}
+function abrirLinkComToken() { location.href = location.pathname + '#t=' + encodeURIComponent(CFG.token); location.reload(); }
+function mostrarSetup(v) {
+  document.getElementById('setup').style.display = v ? '' : 'none';
+  document.getElementById('linkBox').style.display = CFG.token ? '' : 'none';
+  document.getElementById('inRepo').value = CFG.repo;
+  document.getElementById('inToken').value = '';
+  document.getElementById('btSair').style.display = CFG.token ? '' : 'none';
+}
+async function salvarSetup() {
+  const repo = document.getElementById('inRepo').value.trim().replace(/^https?:\/\/github\.com\//, '').replace(/\/$/, '');
+  const token = document.getElementById('inToken').value.trim() || CFG.token;
+  const msg = document.getElementById('msgSetup');
+  if (!/^[\w.-]+\/[\w.-]+$/.test(repo) || !token) { msg.innerHTML = '<span style="color:var(--err)">Preencha o repositório e o token.</span>'; return; }
+  msg.textContent = 'testando…';
+  CFG = { repo, token };
+  try {
+    const r = await api('');
+    if (r.status === 401) throw new Error('token inválido ou vencido');
+    if (r.status === 404) throw new Error('repositório não encontrado (ou o token não tem acesso a ele)');
+    const j = await r.json();
+    if (!j.private) msg.innerHTML = '<span style="color:var(--warn)">⚠ Esse repositório é público — deixe privado.</span>';
+    LS.set('ctl_repo', repo); guardarToken(token);
+    mostrarSetup(false);
+    st.etag = null; enviarPing(true); buscarPainel();
+  } catch (e) { msg.innerHTML = `<span style="color:var(--err)">❌ ${esc(e.message)}</span>`; }
+}
+function esquecer() { LS.del('ctl_token'); CK.del('ctl_token'); if (tokenDoLink()) history.replaceState(null, '', location.pathname); CFG.token = ''; st.painel = null; document.getElementById('painel').innerHTML = ''; mostrarSetup(true); }
+
+// ── leitura do painel ──────────────────────────────────────────────────────
+async function buscarPainel() {
+  if (!CFG.token) return;
+  try {
+    const h = { Accept: 'application/vnd.github.raw+json' };
+    if (st.etag) h['If-None-Match'] = st.etag;
+    let r = await api(`contents/${st.arqPainel}?ref=status`, { headers: h });
+    if (r.status === 404 && st.arqPainel === 'painel.json.gz') {          // PC com robo_remoto antigo
+      st.arqPainel = 'painel.json'; st.etag = null;
+      r = await api(`contents/painel.json?ref=status`, { headers: { Accept: 'application/vnd.github.raw+json' } });
+    }
+    if (r.status === 304) { st.erro = ''; return atualizarPill(); }
+    if (r.status === 401) { st.erro = 'token inválido'; mostrarSetup(true); return atualizarPill(); }
+    if (r.status === 404) { st.erro = 'o PC ainda não publicou o painel'; mostrarVazio('⏳ Esperando o PC publicar o painel pela primeira vez.<br><small>Abra o controlador (V18) no Jupyter ou ligue o robo_porteiro no PC.</small>'); return atualizarPill(); }
+    if (!r.ok) throw new Error('GitHub ' + r.status);
+    st.etag = r.headers.get('ETag');
+    let p;
+    if (st.arqPainel.endsWith('.gz')) {
+      const ds = new Blob([await r.arrayBuffer()]).stream().pipeThrough(new DecompressionStream('gzip'));
+      p = JSON.parse(await new Response(ds).text());
+    } else p = JSON.parse(await r.text());
+    st.erro = '';
+    receberPainel(p);
+  } catch (e) { st.erro = 'sem conexão'; atualizarPill(); }
+}
+function mostrarVazio(h) { const v = document.getElementById('vazio'); v.style.display = ''; v.innerHTML = h; }
+
+function receberPainel(p) {
+  st.painel = p; st.carregou = true;
+  document.getElementById('vazio').style.display = 'none';
+  // pedidos já executados pelo PC: solta os valores "pendentes"
+  const feito = p.ultimo_cmd || 0;
+  const aindaEsperando = st.enviados.filter(e => e.id > feito);
+  if (aindaEsperando.length !== st.enviados.length) {
+    st.enviados = aindaEsperando;
+    const ids = new Set(); aindaEsperando.forEach(e => e.ops.forEach(o => o.set && ids.add(o.set)));
+    st.fila.forEach(o => o.set && ids.add(o.set));
+    for (const k of [...st.pend.keys()]) if (!ids.has(k)) st.pend.delete(k);
+  }
+  desenhar();
+  atualizarPill();
+}
+
+function atualizarPill() {
+  const pill = document.getElementById('pill'), p = st.painel;
+  let cls = '', txt = 'conectando…';
+  if (st.erro && !p) { cls = 'err'; txt = st.erro; }
+  else if (p) {
+    const idade = Date.now() / 1000 - (p.epoch || 0);
+    const limite = (p.sempre_s || 240) * 1.5 + 30;      // o PC manda sinal de vida a cada ~4 min
+    const quando = idade < 90 ? `há ${Math.max(0, Math.round(idade))} s` : idade < 5400 ? `há ${Math.round(idade / 60)} min` : `em ${p.ts.substring(8, 10)}/${p.ts.substring(5, 7)} ${p.ts.substring(11, 16)}`;
+    const acordando = !p.olhando && Date.now() - st.abriuEm < 45000 && idade > 20;
+    if (acordando && idade < limite) { cls = 'warn'; txt = `🟡 avisando o PC que você abriu… · último sinal ${quando}`; }
+    else if (idade < limite) { cls = 'ok'; txt = `🟢 PC online · ${quando}`; }
+    else { cls = 'err'; txt = `🔴 PC sem responder · último sinal ${quando}`; }
+    if (st.erro) { cls = 'warn'; txt += ' · ' + st.erro; }
+  }
+  pill.className = cls; pill.textContent = txt;
+  pill.title = p ? `${p.host || ''} · ${p.onde === 'headless' ? 'sem Jupyter (porteiro)' : 'Jupyter'} · ${p.versao || ''}` : '';
+  const env = document.getElementById('envio');
+  env.textContent = st.enviando ? '⏳ enviando…' : st.fila.length ? '✏️ alterações a enviar…' :
+    st.enviados.length ? '⌛ aguardando o PC executar…' : '';
+}
+
+// ── desenho ────────────────────────────────────────────────────────────────
+function assinatura(n) {   // estrutura (muda → redesenha tudo)
+  if (!n) return '';
+  let s = n.id + ':' + n.t;
+  if (n.t === 'sel' || n.t === 'tog' || n.t === 'multi') s += '[' + n.op.join('|') + ']';
+  if (n.t === 'tab') s += '{' + n.tit.join('|') + '}';
+  if (n.c) s += '(' + n.c.map(assinatura).join(',') + ')';
+  return s;
+}
+function limpaHtml(h) {
+  return String(h || '').replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    .replace(/<a\s/gi, '<a target="_blank" rel="noopener" ');
+}
+function larg(n) {
+  if (!n.w) return '';
+  const w = String(n.w);
+  return /px$/.test(w) && parseInt(w) > 0 ? `width:${w};` : /%$/.test(w) ? `width:${w};` : '';
+}
+function valorAtual(n) { return st.pend.has(n.id) ? st.pend.get(n.id) : n.v; }
+
+function el(n) {
+  const d = document.createElement('div');
+  d.className = 'wd'; d.dataset.id = n.id;
+  switch (n.t) {
+    case 'hide': d.style.display = 'none'; return d;
+    case 'tab': return elTab(n);
+    case 'box': {
+      d.className = 'wd bx ' + (n.dir === 'v' ? 'v' : 'h');
+      if (n.align_items) d.style.alignItems = n.align_items;
+      if (n.justify_content) d.style.justifyContent = n.justify_content;
+      if (n.border_bottom) d.style.borderBottom = n.border_bottom;
+      if (n.padding) d.style.padding = n.padding;
+      if (n.border) d.style.border = n.border;
+      if (n.max_height) {           // lista com rolagem própria (ex.: voos do Hoteis Flash)
+        d.classList.add('rola');
+        d.style.maxHeight = '85vh';   // (a página está com zoom 70% → ~60% da tela)
+        d.style.flexWrap = 'nowrap';
+      }
+      if (n.w && /%$/.test(n.w)) d.style.width = n.w;
+      n.c.forEach(c => d.appendChild(el(c)));
+      // linha "caixinha + texto" (ex.: lista de voos): não quebra a caixinha numa linha sozinha
+      const vis = n.c.filter(c => c.t !== 'hide');
+      if (n.dir !== 'v' && vis.length === 2 && vis[0].t === 'chk' && !vis[0].d && vis[1].t === 'html') {
+        d.style.flexWrap = 'nowrap'; d.lastChild.style.flex = '1 1 0';
+      }
+      return d;
+    }
+    case 'html': case 'lbl': {
+      d.className = 'wd html';
+      d.innerHTML = n.t === 'lbl' ? esc(n.v) : limpaHtml(n.v);
+      d.dataset.v = n.v;
+      return d;
+    }
+    case 'out': { d.className = 'wd out'; d.textContent = n.v || ''; return d; }
+    case 'btn': {
+      const b = document.createElement('button');
+      b.className = 'wd btn' + (n.st ? ' st-' + n.st : ''); b.dataset.id = n.id;
+      b.textContent = n.d || '·'; if (n.tip) b.title = n.tip;
+      b.disabled = !!n.dis;
+      if (n.w && parseInt(n.w) > 0) b.style.minWidth = `min(${n.w}, 100%)`;
+      b.onclick = () => clicar(n.id, b);
+      return b;
+    }
+    case 'chk': {
+      const l = document.createElement('label'); l.className = 'wd chk'; l.dataset.id = n.id;
+      const i = document.createElement('input'); i.type = 'checkbox'; i.checked = !!valorAtual(n); i.disabled = !!n.dis;
+      i.onchange = () => mudar(n.id, i.checked, 400);
+      l.appendChild(i);
+      if (n.d) { const s = document.createElement('span'); s.textContent = n.d; l.appendChild(s); }
+      if (n.w && parseInt(n.w) > 40) l.style.minWidth = `min(${n.w}, 100%)`;
+      if (st.pend.has(n.id)) l.classList.add('pend');
+      return l;
+    }
+    case 'txt': case 'num': case 'date': case 'area': {
+      const box = rotulado(n);
+      const i = document.createElement(n.t === 'area' ? 'textarea' : 'input');
+      i.className = n.t; i.dataset.inp = n.id;
+      if (n.t === 'txt') { i.type = 'text'; i.placeholder = n.ph || ''; }
+      if (n.t === 'num') { i.type = 'number'; i.inputMode = n.int ? 'numeric' : 'decimal'; if (n.min != null) i.min = n.min; if (n.max != null) i.max = n.max; if (n.step) i.step = n.step; }
+      if (n.t === 'date') i.type = 'date';
+      if (n.t === 'area') i.placeholder = n.ph || '';
+      i.value = valorAtual(n) ?? '';
+      i.disabled = !!n.dis;
+      const w = larg(n); if (w && n.t !== 'area') i.style.cssText = w.replace(/width:(\d+)px/, (m, p) => `width:min(${Math.max(70, p - (n.d ? 70 : 0))}px,100%)`);
+      if (n.t === 'num') i.style.width = '46px';                 // números: campo curto
+      if (n.t === 'txt' && parseInt(n.w) > 0 && parseInt(n.w) <= 130) i.style.width = '56px';   // ex.: Idades
+      const conv = () => n.t === 'num' ? (i.value === '' ? 0 : Number(i.value)) : i.value;
+      i.oninput = () => { st.pend.set(n.id, conv()); i.classList.add('pend'); };
+      i.onchange = () => mudar(n.id, conv(), 300);
+      if (n.t === 'txt') i.onkeydown = ev => { if (ev.key === 'Enter') { i.blur(); } };
+      if (st.pend.has(n.id)) i.classList.add('pend');
+      box.appendChild(i);
+      return box;
+    }
+    case 'sel': {
+      const box = rotulado(n);
+      const s = document.createElement('select'); s.className = 'sel'; s.dataset.inp = n.id;
+      s.innerHTML = (valorAtual(n) < 0 ? '<option value="-1">—</option>' : '') + n.op.map((o, i) => `<option value="${i}">${esc(o)}</option>`).join('');
+      s.value = String(valorAtual(n)); s.disabled = !!n.dis;
+      s.onchange = () => mudar(n.id, parseInt(s.value), 300);
+      if (st.pend.has(n.id)) s.classList.add('pend');
+      box.appendChild(s); return box;
+    }
+    case 'multi': {
+      const box = rotulado(n);
+      // lista sempre aberta (o <select multiple> do iPhone vira "0 Items" e esconde tudo)
+      box.style.flexWrap = 'wrap';
+      const s = document.createElement('div'); s.className = 'multi mlist'; s.dataset.inp = n.id;
+      const v = new Set(valorAtual(n) || []);
+      if (!n.op.length) s.innerHTML = '<div class="mvazio">(vazio)</div>';
+      n.op.forEach((o, i) => {
+        const it = document.createElement('div'); it.className = 'mitem' + (v.has(i) ? ' on' : ''); it.textContent = o;
+        it.onclick = () => {
+          if (n.dis) return;
+          it.classList.toggle('on');
+          mudar(n.id, [...s.children].map((c, k) => c.classList.contains('on') ? k : -1).filter(k => k >= 0), 500);
+        };
+        s.appendChild(it);
+      });
+      if (n.w && parseInt(n.w) > 0) s.style.width = `min(${n.w}, 100%)`;
+      box.appendChild(s); return box;
+    }
+    case 'tog': {
+      const box = rotulado(n);
+      const g = document.createElement('div'); g.className = 'tog'; g.dataset.inp = n.id;
+      n.op.forEach((o, i) => {
+        const b = document.createElement('button'); b.textContent = o; b.type = 'button';
+        if (i === valorAtual(n)) b.classList.add('on');
+        b.disabled = !!n.dis;
+        b.onclick = () => { [...g.children].forEach(x => x.classList.remove('on')); b.classList.add('on'); mudar(n.id, i, 200); };
+        g.appendChild(b);
+      });
+      box.appendChild(g); return box;
+    }
+  }
+  d.textContent = n.v ?? ''; return d;
+}
+function rotulado(n) {
+  const box = document.createElement('div'); box.className = 'wd bx h'; box.dataset.id = n.id;
+  box.style.gap = '4px'; box.style.flexWrap = 'nowrap';
+  if (n.d) { const l = document.createElement('span'); l.className = 'lbl-d'; l.textContent = n.d; box.appendChild(l); }
+  if (n.tip) box.title = n.tip;
+  return box;
+}
+function elTab(n) {
+  const d = document.createElement('div'); d.className = 'wd'; d.dataset.id = n.id; d.style.width = '100%';
+  const raiz = (n.tit || []).some(t => /Robôs/.test(t));    // abas principais do controlador
+  const chave = raiz ? 'ctl_aba' : 'ctl_aba_' + (n.tit || []).join('|');
+  let sel = raiz ? st.aba : (parseInt(LS.get(chave, '0')) || 0);
+  if (sel >= n.c.length) sel = 0;
+  const bar = document.createElement('div'); bar.className = 'tabs';
+  const pane = document.createElement('div'); pane.className = 'tabpane';
+  n.tit.forEach((t, i) => {
+    const b = document.createElement('button'); b.textContent = t || `Aba ${i + 1}`;
+    if (i === sel) b.classList.add('on');
+    b.onclick = () => {
+      if (raiz) st.aba = i; LS.set(chave, String(i));
+      [...bar.children].forEach(x => x.classList.remove('on')); b.classList.add('on');
+      [...pane.children].forEach((x, j) => x.style.display = j === i ? '' : 'none');
+    };
+    bar.appendChild(b);
+  });
+  n.c.forEach((c, i) => { const e = el(c); e.style.display = i === sel ? '' : 'none'; pane.appendChild(e); });
+  d.appendChild(bar); d.appendChild(pane);
+  return d;
+}
+
+// Atualiza só valores/textos quando a estrutura não mudou (não perde foco nem rolagem)
+function remendar(n) {
+  if (!n) return;
+  const e = document.querySelector(`[data-id="${CSS.escape(n.id)}"]`);
+  if (e) {
+    if (n.t === 'html' && e.dataset.v !== n.v) { e.innerHTML = limpaHtml(n.v); e.dataset.v = n.v; }
+    else if (n.t === 'lbl') e.textContent = n.v;
+    else if (n.t === 'out') { const fim = e.scrollTop + e.clientHeight >= e.scrollHeight - 4; e.textContent = n.v || ''; if (fim) e.scrollTop = e.scrollHeight; }
+    else if (n.t === 'btn') { e.textContent = n.d || '·'; e.disabled = !!n.dis; e.className = 'wd btn' + (n.st ? ' st-' + n.st : '') + (e.classList.contains('enviando') ? ' enviando' : ''); if (n.tip) e.title = n.tip; }
+    else if (!st.pend.has(n.id)) {
+      const i = n.t === 'chk' ? e.querySelector('input') : e.querySelector(`[data-inp="${CSS.escape(n.id)}"]`);
+      if (i && document.activeElement !== i) {
+        if (n.t === 'chk') { i.checked = !!n.v; i.disabled = !!n.dis; e.classList.remove('pend'); }
+        else if (n.t === 'multi') { const v = new Set(n.v || []); [...i.querySelectorAll('.mitem')].forEach((o, k) => o.classList.toggle('on', v.has(k))); }
+        else if (n.t === 'tog') { [...i.children].forEach((b, k) => { b.classList.toggle('on', k === n.v); b.disabled = !!n.dis; }); }
+        else { const nv = n.v ?? ''; if (String(i.value) !== String(nv)) i.value = nv; i.disabled = !!n.dis; i.classList.remove('pend'); }
+      }
+    }
+  }
+  if (n.c) n.c.forEach(remendar);
+}
+
+function desenhar() {
+  const p = st.painel; if (!p || !p.ui) return;
+  const raiz = document.getElementById('painel');
+  const a = assinatura(p.ui);
+  if (a !== st.assin) {
+    const y = window.scrollY;
+    raiz.innerHTML = '';
+    raiz.appendChild(el(p.ui));
+    st.assin = a;
+    window.scrollTo(0, y);
+  } else {
+    remendar(p.ui);
+  }
+  document.title = (p.titulo ? '🎛️ ' + p.titulo : 'Controle do Robô');
+}
+
+// ── envio de pedidos ───────────────────────────────────────────────────────
+function mudar(id, v, atraso) {
+  st.pend.set(id, v);
+  st.fila = st.fila.filter(o => o.set !== id);
+  st.fila.push({ set: id, v });
+  agendarEnvio(atraso);
+  atualizarPill();
+}
+function clicar(id, b) {
+  // valores digitados e ainda não confirmados (campo com foco) vão junto
+  const foco = document.activeElement;
+  if (foco && foco.dataset && foco.dataset.inp && st.pend.has(foco.dataset.inp)) {
+    const k = foco.dataset.inp; st.fila = st.fila.filter(o => o.set !== k); st.fila.push({ set: k, v: st.pend.get(k) });
+  }
+  st.fila.push({ click: id });
+  if (b) { b.classList.add('enviando'); setTimeout(() => b.classList.remove('enviando'), 4000); }
+  agendarEnvio(0);
+  atualizarPill();
+}
+function agendarEnvio(ms) {
+  clearTimeout(st.timerEnvio);
+  st.timerEnvio = setTimeout(enviar, ms);
+}
+async function enviar() {
+  if (st.enviando) { agendarEnvio(500); return; }
+  if (!st.fila.length) return;
+  const ops = st.fila.splice(0);
+  st.enviando = true; atualizarPill();
+  const ok = await gravarPedido(ops);
+  st.enviando = false;
+  if (!ok) { st.fila = ops.concat(st.fila); agendarEnvio(3000); }
+  atualizarPill();
+}
+async function gravarPedido(ops) {
+  const id = Date.now();
+  for (let tent = 0; tent < 5; tent++) {
+    try {
+      let sha, cmds = [];
+      const r = await api('contents/cmd.json?ref=comandos');
+      if (r.ok) { const j = await r.json(); sha = j.sha; try { cmds = JSON.parse(b64dec(j.content)).cmds || []; } catch (e) { cmds = []; } }
+      else if (r.status !== 404) throw new Error('GitHub ' + r.status);
+      const ultimo = cmds.reduce((m, c) => Math.max(m, c.id || 0), 0);
+      const meuId = Math.max(id, ultimo + 1);
+      cmds.push({ id: meuId, ops });
+      cmds = cmds.slice(-40);
+      const corpo = { message: 'pedido ' + new Date(meuId).toISOString(), content: b64enc(JSON.stringify({ cmds })), branch: 'comandos' };
+      if (sha) corpo.sha = sha;
+      const w = await api('contents/cmd.json', { method: 'PUT', body: JSON.stringify(corpo), headers: { 'Content-Type': 'application/json' } });
+      if (w.ok) {
+        if (ops.some(o => !o.ping)) st.enviados.push({ id: meuId, ops });
+        st.erro = '';
+        if (ops.some(o => o.click)) { setTimeout(buscarPainel, 4000); setTimeout(buscarPainel, 8000); }
+        return true;
+      }
+      if (w.status === 409 || w.status === 422) { await new Promise(r => setTimeout(r, 400 + Math.random() * 600)); continue; }
+      if (w.status === 403 || w.status === 404) { st.erro = 'o token não pode gravar no repositório'; return false; }
+      throw new Error('GitHub ' + w.status);
+    } catch (e) { st.erro = 'falha ao enviar (' + e.message + ')'; await new Promise(r => setTimeout(r, 800)); }
+  }
+  return false;
+}
+// "estou olhando": o PC passa a atualizar a cada 5 s enquanto esta página está aberta
+function enviarPing(forcar) {
+  if (!CFG.token || document.hidden) return;
+  if (!forcar && Date.now() - st.ultimoPing < 100000) return;
+  st.ultimoPing = Date.now();
+  st.fila.push({ ping: 1 }); agendarEnvio(0);
+}
+
+// ── laço ───────────────────────────────────────────────────────────────────
+function ciclo() {
+  if (!document.hidden && CFG.token) { buscarPainel(); enviarPing(false); }
+  atualizarPill();
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { st.abriuEm = Date.now(); enviarPing(true); buscarPainel(); } });
+setInterval(ciclo, 3500);
+if (!CFG.token) mostrarSetup(true); else { enviarPing(true); buscarPainel(); }
+</script>
+</body>
+</html>

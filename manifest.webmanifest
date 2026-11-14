@@ -1,0 +1,14 @@
+{
+  "name": "Voos e Hotéis",
+  "short_name": "Voos",
+  "description": "Preços de passagens coletados pelos robôs",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#00875a",
+  "icons": [
+    { "src": "icone-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icone-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
