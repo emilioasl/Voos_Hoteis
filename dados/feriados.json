@@ -1,0 +1,240 @@
+{
+ "versao": 1,
+ "atualizado": "2026-11-24 23:50",
+ "feriados": [
+  {
+   "id": "negros2026",
+   "tipo": "feriado",
+   "nome": "🟡 Novembro (19-22) Negros (Sex)",
+   "janelas": [
+    {
+     "ida_de": "2026-11-19",
+     "ida_ate": "2026-11-20",
+     "volta_de": "2026-11-22",
+     "volta_ate": "2026-11-22",
+     "noites_min": 1,
+     "noites_max": 0
+    }
+   ]
+  },
+  {
+   "id": "natal2026",
+   "tipo": "feriado",
+   "nome": "🎄 Dezembro Natal/Ano Novo",
+   "janelas": [
+    {
+     "ida_de": "2026-12-23",
+     "ida_ate": "",
+     "volta_de": "",
+     "volta_ate": "2027-01-10",
+     "noites_min": 9,
+     "noites_max": 0
+    }
+   ]
+  },
+  {
+   "id": "confra2027",
+   "tipo": "feriado",
+   "nome": "🟡 2027 Janeiro (31/12-3) Confraternização (Sex)",
+   "janelas": [
+    {
+     "ida_de": "2026-12-31",
+     "ida_ate": "2027-01-01",
+     "volta_de": "2027-01-03",
+     "volta_ate": "2027-01-03",
+     "noites_min": 1,
+     "noites_max": 0
+    }
+   ]
+  },
+  {
+   "id": "niversp2027",
+   "tipo": "feriado",
+   "nome": "🎂 2027 Janeiro (22-25) Niver SP (Seg)",
+   "janelas": [
+    {
+     "ida_de": "2027-01-22",
+     "ida_ate": "2027-01-23",
+     "volta_de": "2027-01-25",
+     "volta_ate": "2027-01-25",
+     "noites_min": 2,
+     "noites_max": 0
+    }
+   ]
+  },
+  {
+   "id": "carnametade2027",
+   "tipo": "feriado",
+   "nome": "🎭 2027 Fevereiro (5-10) Carna Metade",
+   "janelas": [
+    {
+     "ida_de": "2027-02-05",
+     "ida_ate": "2027-02-06",
+     "volta_de": "",
+     "volta_ate": "2027-02-10",
+     "noites_min": 1,
+     "noites_max": 0
+    }
+   ]
+  },
+  {
+   "id": "carnainteiro2027",
+   "tipo": "feriado",
+   "nome": "🎭 2027 Fevereiro (5-14) Carna Inteiro",
+   "janelas": [
+    {
+     "ida_de": "2027-02-05",
+     "ida_ate": "2027-02-07",
+     "volta_de": "2027-02-11",
+     "volta_ate": "2027-02-14",
+     "noites_min": 1,
+     "noites_max": 0
+    }
+   ]
+  },
+  {
+   "id": "paixao2027",
+   "tipo": "feriado",
+   "nome": "🟡 2027 Março (25-28) Paixão de Cristo (Sex)",
+   "janelas": [
+    {
+     "ida_de": "2027-03-25",
+     "ida_ate": "2027-03-26",
+     "volta_de": "2027-03-28",
+     "volta_ate": "2027-03-28",
+     "noites_min": 1,
+     "noites_max": 0
+    }
+   ]
+  },
+  {
+   "id": "tiradentes2027",
+   "tipo": "feriado",
+   "nome": "🟡 2027 Abril (17-25) Tiradentes (Qua)",
+   "janelas": [
+    {
+     "ida_de": "2027-04-17",
+     "ida_ate": "2027-04-18",
+     "volta_de": "2027-04-21",
+     "volta_ate": "2027-04-21",
+     "noites_min": 1,
+     "noites_max": 0
+    },
+    {
+     "ida_de": "2027-04-21",
+     "ida_ate": "2027-04-21",
+     "volta_de": "2027-04-25",
+     "volta_ate": "2027-04-25",
+     "noites_min": 1,
+     "noites_max": 0
+    }
+   ]
+  },
+  {
+   "id": "corpus2027",
+   "tipo": "feriado",
+   "nome": "🟡 2027 Maio (26-30) Corpus Christi (Qui)",
+   "janelas": [
+    {
+     "ida_de": "2027-05-26",
+     "ida_ate": "2027-05-27",
+     "volta_de": "2027-05-30",
+     "volta_ate": "2027-05-30",
+     "noites_min": 1,
+     "noites_max": 0
+    }
+   ]
+  },
+  {
+   "id": "julho2027",
+   "tipo": "feriado",
+   "nome": "🟡 2027 Julho (8-11) Revolução Const. (Sex)",
+   "janelas": [
+    {
+     "ida_de": "2027-07-08",
+     "ida_ate": "2027-07-09",
+     "volta_de": "2027-07-11",
+     "volta_ate": "2027-07-11",
+     "noites_min": 1,
+     "noites_max": 0
+    }
+   ]
+  },
+  {
+   "id": "indep2027",
+   "tipo": "feriado",
+   "nome": "🟡 2027 Setembro (3-7) Independência (Ter)",
+   "janelas": [
+    {
+     "ida_de": "2027-09-03",
+     "ida_ate": "2027-09-04",
+     "volta_de": "2027-09-07",
+     "volta_ate": "2027-09-07",
+     "noites_min": 1,
+     "noites_max": 0
+    }
+   ]
+  },
+  {
+   "id": "aparecida2027",
+   "tipo": "feriado",
+   "nome": "🟡 2027 Outubro (8-12) Aparecida (Ter)",
+   "janelas": [
+    {
+     "ida_de": "2027-10-08",
+     "ida_ate": "2027-10-09",
+     "volta_de": "2027-10-12",
+     "volta_ate": "2027-10-12",
+     "noites_min": 1,
+     "noites_max": 0
+    }
+   ]
+  },
+  {
+   "id": "finados2027",
+   "tipo": "feriado",
+   "nome": "🟡 2027 Outubro (29-2) Finados (Ter)",
+   "janelas": [
+    {
+     "ida_de": "2027-10-29",
+     "ida_ate": "2027-10-30",
+     "volta_de": "2027-11-02",
+     "volta_ate": "2027-11-02",
+     "noites_min": 1,
+     "noites_max": 0
+    }
+   ]
+  },
+  {
+   "id": "proclamacao2027",
+   "tipo": "feriado",
+   "nome": "🟡 2027 Novembro (12-15) Proclamação (Seg)",
+   "janelas": [
+    {
+     "ida_de": "2027-11-12",
+     "ida_ate": "2027-11-13",
+     "volta_de": "2027-11-15",
+     "volta_ate": "2027-11-15",
+     "noites_min": 1,
+     "noites_max": 0
+    }
+   ]
+  },
+  {
+   "id": "natal2027",
+   "tipo": "feriado",
+   "nome": "🎄 2027 Dezembro Natal/Ano Novo",
+   "janelas": [
+    {
+     "ida_de": "2027-12-23",
+     "ida_ate": "",
+     "volta_de": "",
+     "volta_ate": "2028-01-10",
+     "noites_min": 9,
+     "noites_max": 0
+    }
+   ]
+  }
+ ],
+ "migr_v139": true
+}

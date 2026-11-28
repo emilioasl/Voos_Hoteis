@@ -1,0 +1,76 @@
+{
+ "versao": 1,
+ "atualizado": "2026-11-28 03:27",
+ "eventos": [
+  {
+   "id": "ferias0",
+   "tipo": "ferias",
+   "nome": "Minhas férias",
+   "ini": "2026-12-24",
+   "fim": "2027-01-09"
+  },
+  {
+   "id": "46b430d6",
+   "tipo": "viagem",
+   "nome": "Passo Fundo Surpresa",
+   "ini": "2027-01-16",
+   "fim": "2027-01-17"
+  },
+  {
+   "id": "13d3c91a",
+   "tipo": "viagem",
+   "nome": "Renata no BR",
+   "ini": "2027-02-21",
+   "fim": "2027-03-05"
+  },
+  {
+   "id": "d2f81e45",
+   "tipo": "viagem",
+   "nome": "Aniversario do Nicola",
+   "ini": "2027-02-26",
+   "fim": "2027-02-28"
+  },
+  {
+   "id": "855b310d",
+   "tipo": "viagem",
+   "nome": "Motogp Goiania",
+   "ini": "2027-04-02",
+   "fim": "2027-04-04"
+  },
+  {
+   "id": "4bc21b10",
+   "tipo": "viagem",
+   "nome": "Buzios com Vizinhos",
+   "ini": "2027-04-09",
+   "fim": "2027-04-11"
+  },
+  {
+   "id": "923ec09f",
+   "tipo": "viagem",
+   "nome": "Buzios Familia Mayra",
+   "ini": "2027-05-07",
+   "fim": "2027-05-09"
+  },
+  {
+   "id": "3a2853ad",
+   "tipo": "viagem",
+   "nome": "Noronha",
+   "ini": "2027-06-03",
+   "fim": "2027-06-06"
+  },
+  {
+   "id": "95b36852",
+   "tipo": "viagem",
+   "nome": "Fortaleza",
+   "ini": "2027-06-11",
+   "fim": "2027-06-13"
+  },
+  {
+   "id": "04004bab",
+   "tipo": "viagem",
+   "nome": "Valle Nevado",
+   "ini": "2027-09-30",
+   "fim": "2027-10-03"
+  }
+ ]
+}
